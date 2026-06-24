@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Halı Saha Taktik ve Denge Testi</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <style>
+    /* TEMEL TASARIM VE İSKELET */
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; padding: 20px; margin: 0; }
+    .container { max-width: 1300px; margin: auto; display: flex; gap: 20px; align-items: flex-start; }
+    .panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .left-panel { flex: 1; min-width: 320px; }
+    .right-panel { flex: 1.5; min-width: 320px; }
+    h2 { color: #1a6b2e; border-bottom: 2px solid #a8e63d; padding-bottom: 5px; margin-top: 0; }
+    
+    /* FORM ELEMANLARI */
+    label { font-weight: bold; font-size: 0.9em; display: block; margin-top: 10px; color: #2c3e50; }
+    select, input[type="text"], input[type="number"] { width: 100%; padding: 8px; margin-top: 5px; border: 1px solid #bdc3c7; border-radius: 4px; box-sizing: border-box; background: #ecf0f1; color: #2c3e50; font-weight: bold; }
+    
+    /* BUTONLAR */
+    button { color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 5px; font-weight: bold; transition: filter 0.2s; width: 100%; box-sizing: border-box; }
+    button:hover { filter: brightness(0.85); }
+    .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
+    .btn-group button { flex: 1 1 calc(50% - 10px); min-width: 120px; margin: 0; }
+
+    /* İSTATİSTİK KUTULARI */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 5px; margin-bottom: 15px; }
+    .stat-box { display: flex; flex-direction: column; background: #eef2f5; border: 1px solid #ddd; border-radius: 5px; overflow: hidden; }
+    .stat-box label { margin: 0; font-size: 0.75em; text-align: center; padding: 4px; color: #555; }
+    .stat-box input { margin: 0; border: none; text-align: center; font-weight: bold; font-size: 1.1em; background: white; padding: 5px; border-radius: 0; }
+    .stat-box.full-width { grid-column: span 2; }
+
+    /* YAN MEVKİ HARİTASI (ARTIK CSS İLE YÖNETİLİYOR, ASLA BOZULMAZ) */
+    .pos-map { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: stretch; margin-top: 10px; }
+    .pos-btn-group { background: #34495e; border: 2px solid #2c3e50; padding: 8px; border-radius: 6px; cursor: pointer; display: flex; flex-direction: column; align-items: center; flex: 1 1 calc(25% - 8px); min-width: 60px; box-sizing: border-box; transition: all 0.2s; color: white; }
+    .pos-btn-group span { font-weight: bold; margin-bottom: 4px; font-size: 1.1em; pointer-events: none; }
+    .cap-input { width: 50px; background: #2c3e50; color: white; border: 1px solid #7f8c8d; border-radius: 3px; text-align: center; margin-top: 4px; padding: 2px; display: none; }
+    .pos-btn-group.active-sec .cap-input { display: block; }
+    .role-select { font-size: 0.7em; margin-top: 6px; width: 100%; display: none; background: #2c3e50; color: white; border: 1px solid #7f8c8d; border-radius: 3px; padding: 4px; box-sizing: border-box; }
+    .pos-btn-group.main-pos .role-select, .pos-btn-group.active-sec .role-select { display: block; }
+    .pos-btn-group.main-pos { border-color: #00d2d3 !important; background: #2c3e50; cursor: not-allowed; }
+    .pos-btn-group.active-sec { border-color: #f39c12 !important; background: #2c3e50; }
+
+    /* PANELER: VERİTABANI & SİMÜLASYON */
+    .db-container { background: #34495e; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #3498db; box-shadow: 0 4px 6px rgba(0,0,0,0.3); color: white; }
+    .match-settings { background: #0d1b2a; color: white; padding: 15px; border-radius: 5px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+    .controls-container { background: #eef2f5; padding: 15px; border-radius: 5px; margin-top: 15px; border: 1px solid #ccc; }
+
+    /* OYUNCU LİSTESİ VE RADAR DETAYLARI */
+    .player-list { max-height: 600px; overflow-y: auto; }
+    details.player-item { background: #fafafa; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 10px; padding: 5px 10px; }
+    summary.player-summary { font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 5px 0; list-style: none; }
+    summary.player-summary::-webkit-details-marker { display: none; }
+    .player-details-content { display: flex; gap: 15px; padding-top: 15px; border-top: 1px dashed #ccc; margin-top: 10px; flex-wrap: wrap; }
+    .stats-text { flex: 1; min-width: 220px; font-size: 0.9em; line-height: 1.6; color: #ecf0f1; }
+    .visuals-wrapper { display: flex; flex-direction: column; align-items: center; gap: 15px; background: rgba(0,0,0,0.15); padding: 15px; border-radius: 8px; flex: 1; min-width: 250px; }
+
+    .result-box { background: #eef2f5; padding: 15px; margin-top: 15px; border-radius: 5px; font-family: monospace; line-height: 1.4; border: 1px solid #ccc; }
+
+    /* TELEFON EKRANLARI İÇİN MOBİL UYUM */
+    @media (max-width: 900px) {
+        .container { flex-direction: column; }
+        .left-panel, .right-panel { width: 100%; box-sizing: border-box; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <div class="panel left-panel">
+      <h2>Oyuncu Ekle / Düzenle</h2>
+      
+      <label>İsim ve Soyisim:</label>
+      <div style="display: flex; gap: 10px;">
+         <input type="text" id="pName" placeholder="İsim">
+         <input type="text" id="pLastName" placeholder="Soyisim">
+      </div>
+      
+      <label>Forma Adı (Sahada Gözüken Ad):</label>
+      <input type="text" id="pShortName" placeholder="(Opsiyonel)">
+      
+      <label>Ana Mevki:</label>
+      <select id="pMainPos">
+        <option value="GK">Kaleci (GK)</option>
+        <option value="CB">Stoper (CB)</option>
+        <option value="LB">Sol Bek (LB)</option>
+        <option value="RB">Sağ Bek (RB)</option>
+        <option value="LWB">Sol Kanat Bek (LWB)</option>
+        <option value="RWB">Sağ Kanat Bek (RWB)</option>
+        <option value="DM">Defansif Orta Saha (DM)</option>
+        <option value="CM">Merkez Orta Saha (CM)</option>
+        <option value="AM">Ofansif Orta Saha (AM)</option>
+        <option value="LM">Sol Açık (LM)</option>
+        <option value="RM">Sağ Açık (RM)</option>
+        <option value="LW">Sol Kanat (LW)</option>
+        <option value="RW">Sağ Kanat (RW)</option>
+        <option value="FW">Forvet (FW)</option>
+      </select>
+      <small style="color: #666;">Rol, istatistiklere göre otomatik atanacaktır.</small>
+
+      <label>Kondisyon:</label>
+      <select id="pCond">
+        <option value="Tam">Tam</option>
+        <option value="İyi">İyi</option>
+        <option value="Vasat">Vasat</option>
+        <option value="Kötü">Kötü</option>
+      </select>
+
+      <label>İstatistikler:</label>
+      <div class="stats-grid">
+        <div class="stat-box"><label>Pas</label><input type="number" id="sPas" min="0" max="100" step="5" value="80"></div>
+        <div class="stat-box"><label>Savunma</label><input type="number" id="sSavunma" min="0" max="100" step="5" value="50"></div>
+        <div class="stat-box"><label>Şut</label><input type="number" id="sSut" min="0" max="100" step="5" value="70"></div>
+        <div class="stat-box"><label>Dribling</label><input type="number" id="sDribling" min="0" max="100" step="5" value="85"></div>
+        <div class="stat-box"><label>Fırsat Yaratma</label><input type="number" id="sFirsat" min="0" max="100" step="5" value="90"></div>
+        <div class="stat-box"><label>Hava</label><input type="number" id="sHava" min="0" max="100" step="5" value="40"></div>
+        <div class="stat-box full-width"><label>Şut Karşılama (Sadece GK)</label><input type="number" id="sSutKar" min="0" max="100" step="5" value="0"></div>
+      </div>
+
+      <label>Yan Mevkiler (Kapasite Oranını Seçin):</label>
+      <div id="livePitchWrap" style="display: flex; flex-direction: column; align-items: center; background: #eef2f5; padding: 15px; border-radius: 6px; box-sizing: border-box;">
+        <span style="color:#1a6b2e; font-weight:bold; margin-bottom:10px; font-size:0.9em;">📍 Oyuncu Mevki Haritası (Canlı)</span>
+        <div id="livePitchContainer"></div>
+      </div>
+      <div id="secPosMap" class="pos-map"></div>
+
+      <button id="btnAddPlayer" style="background: #1a6b2e; margin-top: 20px;">Oyuncuyu Havuza Ekle</button>
+      
+      <div class="btn-group">
+        <button id="btnLoadDummies" style="background: #0d1b2a;">Test Verisi Yükle</button>
+        <button id="btnRemoveDummies" style="background: #c0392b;">🗑️ Testleri Sil</button>
+      </div>
+    </div>
+
+    <div class="panel right-panel">
+      
+      <div class="db-container">
+        <div style="font-weight: bold; margin-bottom: 15px; font-size: 1.1em;">🗄️ Veritabanı Yönetimi</div>
+        
+        <div class="btn-group" style="margin-top: 0; margin-bottom: 15px;">
+            <button id="btnSaveNew" style="background: #2980b9;">➕ Yeni Kaydet</button>
+            <button id="btnExportJSON" style="background: #9b59b6;">📥 Depoyu Dosya Yap</button>
+            <button id="btnImportJSON" style="background: #16a085;">📤 Oyuncu Havuzu Yükle</button>
+        </div>
+        
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch;">
+            <select id="dbSelect" style="flex: 2 1 200px; padding: 10px; margin: 0; background: #2c3e50; color: white; border: 1px solid #7f8c8d; border-radius: 4px;"></select>
+            <div class="btn-group" style="flex: 3 1 300px; margin: 0;">
+                <button id="btnLoadDB" style="background: #27ae60; margin: 0;">📂 Veritabanını Yükle</button>
+                <button id="btnUpdateDB" style="background: #f39c12; margin: 0;">🔄 Güncelle</button>
+                <button id="btnDeleteDB" style="background: #e74c3c; margin: 0;">🗑️ Sil</button>
+            </div>
+        </div>
+      </div>
+
+      <div class="match-settings">
+        <div>
+          <label style="display:inline; margin-right:10px; color: white; margin-top: 0;">Maç Formatı:</label>
+          <select id="matchFormat" style="width: auto; display:inline-block; padding: 5px; border-radius: 4px; color: #333;">
+            <option value="5">5 v 5 (10 Kişi)</option>
+            <option value="6">6 v 6 (12 Kişi)</option>
+            <option value="7" selected>7 v 7 (14 Kişi)</option>
+            <option value="8">8 v 8 (16 Kişi)</option>
+            <option value="9">9 v 9 (18 Kişi)</option>
+            <option value="10">10 v 10 (20 Kişi)</option>
+            <option value="11">11 v 11 (22 Kişi)</option>
+          </select>
+        </div>
+        <div style="font-weight: bold; font-size: 1.1em; color: #a8e63d;" id="selectionStatus">
+          Seçilen: 0 / 14
+        </div>
+      </div>
+
+      <div class="player-list" id="playerListEl">Henüz oyuncu eklenmedi.</div>
+      
+      <div class="controls-container">
+        <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; margin-top: 0;">
+            <input type="checkbox" id="cbForceFill" style="width: auto; transform: scale(1.2);"> 
+            Her Zaman Kadro Bul (Boş mevkilere zorunlu adam yerleştir)
+        </label>
+        
+        <div class="btn-group">
+            <button id="btnRandomSelect" style="background: #8e44ad; font-size: 1.1em; padding: 12px;">🎲 Rastgele Seç</button>
+            <button id="btnRunSim" style="background: #a8e63d; color: #0d1b2a; font-size: 1.1em; padding: 12px;">⚽ Algoritmayı Çalıştır</button>
+        </div>
+      </div>
+      
+      <div class="result-box" id="resultOutput">Algoritmayı çalıştırdığında sonuçlar burada görünecek...</div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
