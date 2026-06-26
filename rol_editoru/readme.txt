@@ -1,0 +1,1 @@
+rol editorunü ayrı açın ve işiniz bittiğinde panoya kaydedilen kodu "constants.js" dosyasına yapıştırın.

@@ -1,23 +1,32 @@
 function isSymmetric(slots) {
-    // Sol ve sağ mevkilerin eşleşme matrisi
     const pairs = [
-        ["LB", "RB"], 
-        ["LCB", "RCB"], 
-        ["LWB", "RWB"],
-        ["LDM", "RDM"], 
-        ["LCM", "RCM"], 
-        ["LM", "RM"],
-        ["LAM", "RAM"], 
-        ["LW", "RW"], 
-        ["LFW", "RFW"]
+        ["LB", "RB"], ["LCB", "RCB"], ["LWB", "RWB"],
+        ["LDM", "RDM"], ["LCM", "RCM"], ["LM", "RM"],
+        ["LAM", "RAM"], ["LW", "RW"], ["LFW", "RFW"]
     ];
-    
-    // Eğer sol varsa sağ da olmalı, sağ varsa sol da olmalı. Biri eksikse asimetriktir.
     for (const [left, right] of pairs) {
-        if (slots.includes(left) !== slots.includes(right)) {
-            return false;
-        }
+        if (slots.includes(left) !== slots.includes(right)) return false;
     }
+    return true;
+}
+
+function isRealistic(d, dm, cm, am, fw, format) {
+    // 5 hatlı yapay yasağı SENİN İSTEĞİNLE tamamen silindi.
+    
+    // Arkası tamamen boş bırakılamaz
+    if (d === 0) return false; 
+    
+    // Tek stoper bırakılıyorsa kesinlikle destekleyici ön libero (DM) olmak zorunda
+    if (d === 1 && dm === 0 && format >= 6) return false; 
+    
+    // İleride kimse yoksa takım maça çıkamaz
+    if (fw === 0 && am === 0) return false; 
+    
+    // Aşırı yığılma engeli
+    const outfield = format - 1;
+    if (d + dm > outfield - 1) return false; 
+    if (fw + am > outfield - 1) return false; 
+
     return true;
 }
 
@@ -25,40 +34,11 @@ function generateAllFormations() {
     const ALL_FORMATIONS = [];
 
     const lines = {
-        DEF: {
-            0: [[]],
-            1: [["CB"]],
-            2: [["LCB", "RCB"], ["LB", "RB"]],
-            3: [["LCB", "CB", "RCB"], ["LB", "CB", "RB"]],
-            4: [["LB", "LCB", "RCB", "RB"], ["LWB", "LCB", "RCB", "RWB"]],
-            5: [["LB", "LCB", "CB", "RCB", "RB"], ["LWB", "LCB", "CB", "RCB", "RWB"]]
-        },
-        DM: {
-            0: [[]],
-            1: [["DM"]],
-            2: [["LDM", "RDM"]],
-            3: [["LDM", "DM", "RDM"]]
-        },
-        CM: {
-            0: [[]],
-            1: [["CM"]],
-            2: [["LCM", "RCM"], ["LM", "RM"]],
-            3: [["LCM", "CM", "RCM"], ["LM", "CM", "RM"]],
-            4: [["LM", "LCM", "RCM", "RM"]]
-        },
-        AM: {
-            0: [[]],
-            1: [["AM"]],
-            2: [["LAM", "RAM"], ["LW", "RW"]],
-            3: [["LAM", "AM", "RAM"], ["LW", "AM", "RW"]],
-            4: [["LW", "LAM", "RAM", "RW"]]
-        },
-        FW: {
-            0: [[]],
-            1: [["FW"]],
-            2: [["LFW", "RFW"]],
-            3: [["LFW", "FW", "RFW"]]
-        }
+        DEF: { 0: [[]], 1: [["CB"]], 2: [["LCB", "RCB"], ["LB", "RB"]], 3: [["LCB", "CB", "RCB"], ["LB", "CB", "RB"]], 4: [["LB", "LCB", "RCB", "RB"], ["LWB", "LCB", "RCB", "RWB"]], 5: [["LB", "LCB", "CB", "RCB", "RB"], ["LWB", "LCB", "CB", "RCB", "RWB"]] },
+        DM: { 0: [[]], 1: [["DM"]], 2: [["LDM", "RDM"]], 3: [["LDM", "DM", "RDM"]] },
+        CM: { 0: [[]], 1: [["CM"]], 2: [["LCM", "RCM"], ["LM", "RM"]], 3: [["LCM", "CM", "RCM"], ["LM", "CM", "RM"]], 4: [["LM", "LCM", "RCM", "RM"]] },
+        AM: { 0: [[]], 1: [["AM"]], 2: [["LAM", "RAM"], ["LW", "RW"]], 3: [["LAM", "AM", "RAM"], ["LW", "AM", "RW"]], 4: [["LW", "LAM", "RAM", "RW"]] },
+        FW: { 0: [[]], 1: [["FW"]], 2: [["LFW", "RFW"]], 3: [["LFW", "FW", "RFW"]] }
     };
 
     for (let format = 5; format <= 11; format++) {
@@ -68,9 +48,18 @@ function generateAllFormations() {
                 for (let cm = 0; cm <= 4; cm++) {
                     for (let am = 0; am <= 4; am++) {
                         for (let fw = 0; fw <= 3; fw++) {
-                            
                             if (d + dm + cm + am + fw === targetN) {
-                                const formationName = `${d}-${dm}-${cm}-${am}-${fw}`;
+                                
+                                if (!isRealistic(d, dm, cm, am, fw, format)) continue;
+
+                                const parts = [d, dm, cm, am, fw];
+                                const nameParts = [];
+                                for (let i = 0; i < 5; i++) {
+                                    if (i === 0 || i === 4) nameParts.push(parts[i]); 
+                                    else if (parts[i] !== 0) nameParts.push(parts[i]); 
+                                }
+                                const formationName = nameParts.join('-');
+
                                 const variants = [];
                                 let vId = 1;
 
@@ -80,14 +69,8 @@ function generateAllFormations() {
                                             lines.AM[am].forEach(amArr => {
                                                 lines.FW[fw].forEach(fwArr => {
                                                     const slots = ["GK", ...defArr, ...dmArr, ...cmArr, ...amArr, ...fwArr];
-                                                    
-                                                    // Sadece kusursuz simetriye sahip varyantlar listeye eklenir
                                                     if (isSymmetric(slots)) {
-                                                        variants.push({
-                                                            id: `f${format}_${d}${dm}${cm}${am}${fw}_${vId++}`,
-                                                            desc: slots.slice(1).join(', '),
-                                                            slots: slots
-                                                        });
+                                                        variants.push({ id: `f${format}_${d}${dm}${cm}${am}${fw}_${vId++}`, desc: slots.slice(1).join(', '), slots: slots });
                                                     }
                                                 });
                                             });
@@ -95,9 +78,7 @@ function generateAllFormations() {
                                     });
                                 });
 
-                                if (variants.length > 0) {
-                                    ALL_FORMATIONS.push({ format, name: formationName, variants });
-                                }
+                                if (variants.length > 0) ALL_FORMATIONS.push({ format, name: formationName, variants });
                             }
                         }
                     }

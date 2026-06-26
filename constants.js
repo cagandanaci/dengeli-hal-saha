@@ -7,109 +7,474 @@ export const CONDITIONS = {
 };
 
 // Mevki ve Rollere Göre CIES Kriter Ağırlıkları (%)
-// Not: Sağ ve Sol varyantlar (LB/RB, LM/RM, LW/RW) aynı rolleri paylaştığı için kopyalandı.
 export const ROLE_WEIGHTS = {
-  // --- KALECİ ---
-  'GK': {
-    'Kaleci': { sutKarsilama: 75, pas: 5, savunma: 10, hava: 10, dribling: 0, firsat: 0 },
-    'Libero Kaleci': { sutKarsilama: 60, pas: 20, savunma: 10, hava: 10, dribling: 0, firsat: 0 }
+  "GK": {
+    "Kaleci": {
+      "sutKarsilama": 75,
+      "pas": 5,
+      "savunma": 10,
+      "hava": 10,
+      "dribling": 0,
+      "firsat": 0
+    },
+    "Libero Kaleci": {
+      "sutKarsilama": 60,
+      "pas": 20,
+      "savunma": 10,
+      "hava": 10,
+      "dribling": 0,
+      "firsat": 0
+    }
   },
-
-  // --- STOPER ---
-  'CB': {
-    'Standart Stoper': { pas: 10, savunma: 75, hava: 10, dribling: 5, sut: 0, firsat: 0 },
-    'Pasör Stoper': { pas: 30, savunma: 55, hava: 5, dribling: 10, sut: 0, firsat: 0 },
-    'Çakılı Stoper': { pas: 5, savunma: 80, hava: 15, dribling: 0, sut: 0, firsat: 0 }
+  "CB": {
+    "Standart Stoper": {
+      "pas": 15,
+      "savunma": 70,
+      "hava": 10,
+      "dribling": 5,
+      "sut": 0,
+      "firsat": 0
+    },
+    "Pasör Stoper": {
+      "pas": 30,
+      "savunma": 55,
+      "hava": 5,
+      "dribling": 10,
+      "sut": 0,
+      "firsat": 0
+    },
+    "Çakılı Stoper": {
+      "pas": 5,
+      "savunma": 80,
+      "hava": 15,
+      "dribling": 0,
+      "sut": 0,
+      "firsat": 0
+    }
   },
-
-  // --- BEK ---
-  'LB': {
-    'Standart Bek': { pas: 15, savunma: 60, hava: 5, dribling: 15, sut: 0, firsat: 5 },
-    'Ofansif Bek': { pas: 20, savunma: 20, hava: 5, dribling: 25, sut: 5, firsat: 25 },
-    'Defansif Bek': { pas: 10, savunma: 70, hava: 10, dribling: 10, sut: 0, firsat: 0 },
-    'Oyun Kurucu Bek': { pas: 30, savunma: 15, hava: 5, dribling: 20, sut: 5, firsat: 25 }
+  "LB": {
+    "Standart Bek": {
+      "pas": 20,
+      "savunma": 55,
+      "hava": 5,
+      "dribling": 15,
+      "sut": 0,
+      "firsat": 5
+    },
+    "Ofansif Bek": {
+      "pas": 20,
+      "savunma": 25,
+      "hava": 5,
+      "dribling": 25,
+      "sut": 5,
+      "firsat": 20
+    },
+    "Defansif Bek": {
+      "pas": 10,
+      "savunma": 70,
+      "hava": 10,
+      "dribling": 10,
+      "sut": 0,
+      "firsat": 0
+    },
+    "Oyun Kurucu Bek": {
+      "pas": 25,
+      "savunma": 20,
+      "hava": 5,
+      "dribling": 20,
+      "sut": 5,
+      "firsat": 25
+    }
   },
-  'RB': {
-    'Standart Bek': { pas: 15, savunma: 60, hava: 5, dribling: 15, sut: 0, firsat: 5 },
-    'Ofansif Bek': { pas: 20, savunma: 20, hava: 5, dribling: 25, sut: 5, firsat: 25 },
-    'Defansif Bek': { pas: 10, savunma: 70, hava: 10, dribling: 10, sut: 0, firsat: 0 },
-    'Oyun Kurucu Bek': { pas: 30, savunma: 15, hava: 5, dribling: 20, sut: 5, firsat: 25 }
+  "LWB": {
+    "Standart Kanat Bek": {
+      "pas": 20,
+      "savunma": 45,
+      "hava": 5,
+      "dribling": 20,
+      "sut": 0,
+      "firsat": 10
+    },
+    "Ofansif Kanat Bek": {
+      "pas": 25,
+      "savunma": 15,
+      "hava": 0,
+      "dribling": 35,
+      "sut": 5,
+      "firsat": 20
+    },
+    "Oyun Kurucu Bek": {
+      "pas": 30,
+      "savunma": 10,
+      "hava": 0,
+      "dribling": 25,
+      "sut": 5,
+      "firsat": 30
+    }
   },
-
-  // --- KANAT BEK ---
-  'LWB': {
-    'Standart Kanat Bek': { pas: 20, savunma: 45, hava: 5, dribling: 20, sut: 5, firsat: 5 },
-    'Ofansif Kanat Bek': { pas: 25, savunma: 15, hava: 0, dribling: 35, sut: 5, firsat: 20 },
-    'Oyun Kurucu Bek': { pas: 30, savunma: 10, hava: 0, dribling: 25, sut: 5, firsat: 30 }
+  "DM": {
+    "Kesici": {
+      "pas": 15,
+      "savunma": 70,
+      "hava": 10,
+      "dribling": 5,
+      "sut": 0,
+      "firsat": 0
+    },
+    "Top Kapan Orta Saha": {
+      "pas": 10,
+      "savunma": 70,
+      "hava": 5,
+      "dribling": 15,
+      "sut": 0,
+      "firsat": 0
+    },
+    "Derin Oyun Kurucu": {
+      "pas": 35,
+      "savunma": 35,
+      "hava": 5,
+      "dribling": 10,
+      "sut": 0,
+      "firsat": 15
+    },
+    "Ön Libero": {
+      "pas": 25,
+      "savunma": 60,
+      "hava": 10,
+      "dribling": 5,
+      "sut": 0,
+      "firsat": 0
+    },
+    "Hücumcu Defansif Orta Saha": {
+      "pas": 20,
+      "savunma": 25,
+      "hava": 5,
+      "dribling": 20,
+      "sut": 20,
+      "firsat": 10
+    }
   },
-  'RWB': {
-    'Standart Kanat Bek': { pas: 20, savunma: 45, hava: 5, dribling: 20, sut: 5, firsat: 5 },
-    'Ofansif Kanat Bek': { pas: 25, savunma: 15, hava: 0, dribling: 35, sut: 5, firsat: 20 },
-    'Oyun Kurucu Bek': { pas: 30, savunma: 10, hava: 0, dribling: 25, sut: 5, firsat: 30 }
+  "CM": {
+    "İki Yönlü Orta Saha": {
+      "pas": 25,
+      "savunma": 30,
+      "hava": 5,
+      "dribling": 20,
+      "sut": 10,
+      "firsat": 10
+    },
+    "Oyun Kurucu": {
+      "pas": 35,
+      "savunma": 10,
+      "hava": 0,
+      "dribling": 15,
+      "sut": 5,
+      "firsat": 35
+    },
+    "Şutör Orta Saha": {
+      "pas": 15,
+      "savunma": 10,
+      "hava": 0,
+      "dribling": 25,
+      "sut": 35,
+      "firsat": 15
+    },
+    "Top Kapan Orta Saha": {
+      "pas": 15,
+      "savunma": 50,
+      "hava": 5,
+      "dribling": 20,
+      "sut": 5,
+      "firsat": 5
+    },
+    "Standart Orta Saha": {
+      "pas": 30,
+      "savunma": 25,
+      "hava": 5,
+      "dribling": 15,
+      "sut": 10,
+      "firsat": 15
+    },
+    "Hücumcu Orta Saha": {
+      "pas": 15,
+      "savunma": 5,
+      "hava": 0,
+      "dribling": 30,
+      "sut": 25,
+      "firsat": 25
+    }
   },
-
-  // --- DEFANSİF ORTA SAHA ---
-  'DM': {
-    'Kesici': { pas: 15, savunma: 70, hava: 10, dribling: 5, sut: 0, firsat: 0 },
-    'Top Kapan Orta Saha': { pas: 10, savunma: 70, hava: 5, dribling: 10, sut: 0, firsat: 5 },
-    'Derin Oyun Kurucu': { pas: 40, savunma: 35, hava: 5, dribling: 10, sut: 0, firsat: 10 },
-    'Ön Libero': { pas: 30, savunma: 55, hava: 10, dribling: 5, sut: 0, firsat: 0 }, 
-    'Hücumcu Defansif Orta Saha': { pas: 25, savunma: 20, hava: 5, dribling: 20, sut: 20, firsat: 10 } 
+  "AM": {
+    "Klasik 10": {
+      "pas": 15,
+      "savunma": 0,
+      "hava": 0,
+      "dribling": 30,
+      "sut": 30,
+      "firsat": 25
+    },
+    "Ofansif Oyun Kurucu": {
+      "pas": 35,
+      "savunma": 5,
+      "hava": 0,
+      "dribling": 20,
+      "sut": 5,
+      "firsat": 35
+    },
+    "Gölge Forvet": {
+      "pas": 15,
+      "savunma": 10,
+      "hava": 0,
+      "dribling": 25,
+      "sut": 35,
+      "firsat": 15
+    },
+    "Agresif Ofansif Orta Saha": {
+      "pas": 15,
+      "savunma": 35,
+      "hava": 5,
+      "dribling": 20,
+      "sut": 15,
+      "firsat": 10
+    }
   },
-
-  // --- MERKEZ ORTA SAHA ---
-  'CM': {
-    'İki Yönlü Orta Saha': { pas: 25, savunma: 20, hava: 5, dribling: 25, sut: 10, firsat: 15 },
-    'Oyun Kurucu': { pas: 40, savunma: 10, hava: 0, dribling: 15, sut: 5, firsat: 30 },
-    'Şutör Orta Saha': { pas: 20, savunma: 10, hava: 0, dribling: 25, sut: 30, firsat: 15 },
-    'Top Kapan Orta Saha': { pas: 15, savunma: 50, hava: 5, dribling: 20, sut: 5, firsat: 5 },
-    'Standart Orta Saha': { pas: 30, savunma: 15, hava: 5, dribling: 20, sut: 10, firsat: 20 }, 
-    'Hücumcu Orta Saha': { pas: 20, savunma: 10, hava: 0, dribling: 30, sut: 20, firsat: 20 } 
+  "LM": {
+    "Standart Açık Orta Saha": {
+      "pas": 25,
+      "savunma": 25,
+      "hava": 0,
+      "dribling": 30,
+      "sut": 5,
+      "firsat": 15
+    },
+    "Ofansif Açık Orta Saha": {
+      "pas": 15,
+      "savunma": 10,
+      "hava": 0,
+      "dribling": 35,
+      "sut": 15,
+      "firsat": 25
+    },
+    "Açık Oyun Kurucu": {
+      "pas": 30,
+      "savunma": 10,
+      "hava": 0,
+      "dribling": 20,
+      "sut": 5,
+      "firsat": 35
+    },
+    "Agresif Kanat": {
+      "pas": 10,
+      "savunma": 45,
+      "hava": 5,
+      "dribling": 20,
+      "sut": 10,
+      "firsat": 10
+    }
   },
-
-  // --- OFANSİF ORTA SAHA ---
-  'AM': {
-    'Klasik 10': { pas: 20, savunma: 0, hava: 0, dribling: 30, sut: 25, firsat: 25 },
-    'Ofansif Oyun Kurucu': { pas: 35, savunma: 5, hava: 0, dribling: 20, sut: 5, firsat: 35 },
-    'Gölge Forvet': { pas: 15, savunma: 5, hava: 0, dribling: 25, sut: 35, firsat: 20 },
-    'Agresif Ofansif Orta Saha': { pas: 15, savunma: 30, hava: 5, dribling: 20, sut: 20, firsat: 10 },
+  "LW": {
+    "Klasik Kanat": {
+      "pas": 15,
+      "savunma": 10,
+      "hava": 0,
+      "dribling": 40,
+      "sut": 10,
+      "firsat": 25
+    },
+    "Kanat Forvet": {
+      "pas": 15,
+      "savunma": 5,
+      "hava": 0,
+      "dribling": 30,
+      "sut": 30,
+      "firsat": 20
+    },
+    "Kanat Oyun Kurucu": {
+      "pas": 30,
+      "savunma": 5,
+      "hava": 0,
+      "dribling": 25,
+      "sut": 10,
+      "firsat": 30
+    },
+    "Agresif Kanat": {
+      "pas": 10,
+      "savunma": 45,
+      "hava": 5,
+      "dribling": 20,
+      "sut": 10,
+      "firsat": 10
+    }
   },
-
-  // --- AÇIK ORTA SAHA ---
-  'LM': {
-    'Standart Açık Orta Saha': { pas: 20, savunma: 25, hava: 0, dribling: 30, sut: 10, firsat: 15 },
-    'Ofansif Açık Orta Saha': { pas: 15, savunma: 10, hava: 0, dribling: 35, sut: 15, firsat: 25 },
-    'Açık Oyun Kurucu': { pas: 30, savunma: 10, hava: 0, dribling: 20, sut: 5, firsat: 35 },
-    'Agresif Kanat': { pas: 10, savunma: 45, hava: 5, dribling: 20, sut: 10, firsat: 10 } 
+  "FW": {
+    "Fırsatçı Golcü": {
+      "pas": 5,
+      "savunma": 0,
+      "hava": 20,
+      "dribling": 5,
+      "sut": 65,
+      "firsat": 5
+    },
+    "Hareketli Forvet": {
+      "pas": 15,
+      "savunma": 5,
+      "hava": 0,
+      "dribling": 30,
+      "sut": 25,
+      "firsat": 25
+    },
+    "Çalışkan Forvet": {
+      "pas": 10,
+      "savunma": 40,
+      "hava": 5,
+      "dribling": 20,
+      "sut": 15,
+      "firsat": 10
+    },
+    "Pivot Forvet": {
+      "pas": 15,
+      "savunma": 10,
+      "hava": 15,
+      "dribling": 10,
+      "sut": 30,
+      "firsat": 20
+    },
+    "Sahte 9": {
+      "pas": 25,
+      "savunma": 5,
+      "hava": 0,
+      "dribling": 20,
+      "sut": 20,
+      "firsat": 30
+    }
   },
-  'RM': {
-    'Standart Açık Orta Saha': { pas: 20, savunma: 25, hava: 0, dribling: 30, sut: 10, firsat: 15 },
-    'Ofansif Açık Orta Saha': { pas: 15, savunma: 10, hava: 0, dribling: 35, sut: 15, firsat: 25 },
-    'Açık Oyun Kurucu': { pas: 30, savunma: 10, hava: 0, dribling: 20, sut: 5, firsat: 35 },
-    'Agresif Kanat': { pas: 10, savunma: 45, hava: 5, dribling: 20, sut: 10, firsat: 10 } 
+  "RB": {
+    "Standart Bek": {
+      "pas": 20,
+      "savunma": 55,
+      "hava": 5,
+      "dribling": 15,
+      "sut": 0,
+      "firsat": 5
+    },
+    "Ofansif Bek": {
+      "pas": 20,
+      "savunma": 25,
+      "hava": 5,
+      "dribling": 25,
+      "sut": 5,
+      "firsat": 20
+    },
+    "Defansif Bek": {
+      "pas": 10,
+      "savunma": 70,
+      "hava": 10,
+      "dribling": 10,
+      "sut": 0,
+      "firsat": 0
+    },
+    "Oyun Kurucu Bek": {
+      "pas": 25,
+      "savunma": 20,
+      "hava": 5,
+      "dribling": 20,
+      "sut": 5,
+      "firsat": 25
+    }
   },
-
-  // --- KANAT ---
-  'LW': {
-    'Klasik Kanat': { pas: 15, savunma: 10, hava: 0, dribling: 40, sut: 10, firsat: 25 },
-    'Kanat Forvet': { pas: 15, savunma: 5, hava: 0, dribling: 30, sut: 30, firsat: 20 },
-    'Kanat Oyun Kurucu': { pas: 30, savunma: 10, hava: 0, dribling: 20, sut: 10, firsat: 30 },
-    'Agresif Kanat': { pas: 10, savunma: 45, hava: 5, dribling: 20, sut: 10, firsat: 10 }
+  "RWB": {
+    "Standart Kanat Bek": {
+      "pas": 20,
+      "savunma": 45,
+      "hava": 5,
+      "dribling": 20,
+      "sut": 0,
+      "firsat": 10
+    },
+    "Ofansif Kanat Bek": {
+      "pas": 25,
+      "savunma": 15,
+      "hava": 0,
+      "dribling": 35,
+      "sut": 5,
+      "firsat": 20
+    },
+    "Oyun Kurucu Bek": {
+      "pas": 30,
+      "savunma": 10,
+      "hava": 0,
+      "dribling": 25,
+      "sut": 5,
+      "firsat": 30
+    }
   },
-  'RW': {
-    'Klasik Kanat': { pas: 15, savunma: 10, hava: 0, dribling: 40, sut: 10, firsat: 25 },
-    'Kanat Forvet': { pas: 15, savunma: 5, hava: 0, dribling: 30, sut: 30, firsat: 20 },
-    'Kanat Oyun Kurucu': { pas: 30, savunma: 10, hava: 0, dribling: 20, sut: 10, firsat: 30 },
-    'Agresif Kanat': { pas: 10, savunma: 45, hava: 5, dribling: 20, sut: 10, firsat: 10 }
+  "RM": {
+    "Standart Açık Orta Saha": {
+      "pas": 25,
+      "savunma": 25,
+      "hava": 0,
+      "dribling": 30,
+      "sut": 5,
+      "firsat": 15
+    },
+    "Ofansif Açık Orta Saha": {
+      "pas": 15,
+      "savunma": 10,
+      "hava": 0,
+      "dribling": 35,
+      "sut": 15,
+      "firsat": 25
+    },
+    "Açık Oyun Kurucu": {
+      "pas": 30,
+      "savunma": 10,
+      "hava": 0,
+      "dribling": 20,
+      "sut": 5,
+      "firsat": 35
+    },
+    "Agresif Kanat": {
+      "pas": 10,
+      "savunma": 45,
+      "hava": 5,
+      "dribling": 20,
+      "sut": 10,
+      "firsat": 10
+    }
   },
-
-  // --- FORVET ---
-  'FW': {
-    'Fırsatçı Golcü': { pas: 5, savunma: 0, hava: 10, dribling: 5, sut: 75, firsat: 5 }, 
-    'Hareketli Forvet': { pas: 15, savunma: 5, hava: 0, dribling: 30, sut: 25, firsat: 25 },
-    'Çalışkan Forvet': { pas: 15, savunma: 30, hava: 5, dribling: 20, sut: 15, firsat: 15 },
-    'Pivot Forvet': { pas: 20, savunma: 10, hava: 15, dribling: 10, sut: 25, firsat: 20 },
-    'Sahte 9': { pas: 25, savunma: 5, hava: 0, dribling: 25, sut: 20, firsat: 25 }
+  "RW": {
+    "Klasik Kanat": {
+      "pas": 15,
+      "savunma": 10,
+      "hava": 0,
+      "dribling": 40,
+      "sut": 10,
+      "firsat": 25
+    },
+    "Kanat Forvet": {
+      "pas": 15,
+      "savunma": 5,
+      "hava": 0,
+      "dribling": 30,
+      "sut": 30,
+      "firsat": 20
+    },
+    "Kanat Oyun Kurucu": {
+      "pas": 30,
+      "savunma": 5,
+      "hava": 0,
+      "dribling": 25,
+      "sut": 10,
+      "firsat": 30
+    },
+    "Agresif Kanat": {
+      "pas": 10,
+      "savunma": 45,
+      "hava": 5,
+      "dribling": 20,
+      "sut": 10,
+      "firsat": 10
+    }
   }
 };
 

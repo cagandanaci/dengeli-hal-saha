@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Taktiksel Rol Editörü</title>
+    <style>
+        body { background: #0b1319; color: #ecf0f1; font-family: sans-serif; padding: 20px; }
+        .pos-group { background: #1a252f; border: 2px solid #34495e; border-radius: 8px; margin-bottom: 20px; padding: 15px; }
+        .pos-title { color: #00d2d3; margin-top: 0; border-bottom: 1px solid #34495e; padding-bottom: 10px; }
+        .role-item { background: #2c3e50; border-radius: 6px; padding: 10px; margin-bottom: 10px; }
+        .role-header { font-weight: bold; color: #f39c12; margin-bottom: 10px; display: flex; justify-content: space-between; }
+        .stat-inputs { display: flex; gap: 10px; flex-wrap: wrap; }
+        .stat-group { display: flex; flex-direction: column; align-items: center; background: rgba(0,0,0,0.2); padding: 5px; border-radius: 4px; }
+        .stat-group label { font-size: 11px; color: #bdc3c7; margin-bottom: 4px; }
+        .stat-group input { width: 50px; background: #34495e; color: white; border: 1px solid #7f8c8d; text-align: center; border-radius: 4px; padding: 4px; }
+        .total-warning { font-size: 12px; font-weight: bold; }
+        .btn-generate { position: sticky; top: 20px; background: #00d2d3; color: #0b1319; border: none; padding: 15px 30px; font-size: 1.2em; font-weight: bold; border-radius: 8px; cursor: pointer; float: right; }
+        textarea { width: 100%; height: 300px; background: #1a252f; color: #2ecc71; border: 2px solid #34495e; border-radius: 8px; padding: 15px; font-family: monospace; font-size: 14px; margin-top: 20px; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+
+<button class="btn-generate" onclick="generateJS()">Kodu Üret (constants.js)</button>
+<h2>🛠️ Taktiksel Rol Editörü</h2>
+<p>Aşağıdaki ağırlıkları ayarlayın. Toplamın 100 olmasına dikkat edin. İşiniz bitince "Kodu Üret" butonuna basın.</p>
+
+<div id="editor"></div>
+<textarea id="outputCode" style="display:none;" readonly></textarea>
+
+<script>
+const roleWeights = {
+  'GK': {
+    'Kaleci': { sutKarsilama: 75, pas: 5, savunma: 10, hava: 10, dribling: 0, firsat: 0 },
+    'Libero Kaleci': { sutKarsilama: 60, pas: 20, savunma: 10, hava: 10, dribling: 0, firsat: 0 }
+  },
+  'CB': {
+    'Standart Stoper': { pas: 10, savunma: 75, hava: 10, dribling: 5, sut: 0, firsat: 0 },
+    'Pasör Stoper': { pas: 30, savunma: 55, hava: 5, dribling: 10, sut: 0, firsat: 0 },
+    'Çakılı Stoper': { pas: 5, savunma: 80, hava: 15, dribling: 0, sut: 0, firsat: 0 }
+  },
+  'LB': {
+    'Standart Bek': { pas: 15, savunma: 60, hava: 5, dribling: 15, sut: 0, firsat: 5 },
+    'Ofansif Bek': { pas: 20, savunma: 20, hava: 5, dribling: 25, sut: 5, firsat: 25 },
+    'Defansif Bek': { pas: 10, savunma: 70, hava: 10, dribling: 10, sut: 0, firsat: 0 },
+    'Oyun Kurucu Bek': { pas: 30, savunma: 15, hava: 5, dribling: 20, sut: 5, firsat: 25 }
+  },
+  'LWB': {
+    'Standart Kanat Bek': { pas: 20, savunma: 45, hava: 5, dribling: 20, sut: 5, firsat: 5 },
+    'Ofansif Kanat Bek': { pas: 25, savunma: 15, hava: 0, dribling: 35, sut: 5, firsat: 20 },
+    'Oyun Kurucu Bek': { pas: 30, savunma: 10, hava: 0, dribling: 25, sut: 5, firsat: 30 }
+  },
+  'DM': {
+    'Kesici': { pas: 15, savunma: 70, hava: 10, dribling: 5, sut: 0, firsat: 0 },
+    'Top Kapan Orta Saha': { pas: 10, savunma: 70, hava: 5, dribling: 10, sut: 0, firsat: 5 },
+    'Derin Oyun Kurucu': { pas: 40, savunma: 35, hava: 5, dribling: 10, sut: 0, firsat: 10 },
+    'Ön Libero': { pas: 30, savunma: 55, hava: 10, dribling: 5, sut: 0, firsat: 0 }, 
+    'Hücumcu Defansif Orta Saha': { pas: 25, savunma: 20, hava: 5, dribling: 20, sut: 20, firsat: 10 } 
+  },
+  'CM': {
+    'İki Yönlü Orta Saha': { pas: 25, savunma: 30, hava: 5, dribling: 25, sut: 5, firsat: 10 },
+    'Oyun Kurucu': { pas: 40, savunma: 5, hava: 0, dribling: 15, sut: 5, firsat: 35 },
+    'Şutör Orta Saha': { pas: 15, savunma: 10, hava: 0, dribling: 25, sut: 35, firsat: 15 },
+    'Top Kapan Orta Saha': { pas: 15, savunma: 50, hava: 5, dribling: 20, sut: 5, firsat: 5 },
+    'Standart Orta Saha': { pas: 30, savunma: 15, hava: 5, dribling: 20, sut: 10, firsat: 20 }, 
+    'Hücumcu Orta Saha': { pas: 15, savunma: 5, hava: 0, dribling: 35, sut: 25, firsat: 20 } 
+  },
+  'AM': {
+    'Klasik 10': { pas: 20, savunma: 0, hava: 0, dribling: 30, sut: 25, firsat: 25 },
+    'Ofansif Oyun Kurucu': { pas: 35, savunma: 5, hava: 0, dribling: 20, sut: 5, firsat: 35 },
+    'Gölge Forvet': { pas: 15, savunma: 5, hava: 0, dribling: 25, sut: 35, firsat: 20 },
+    'Agresif Ofansif Orta Saha': { pas: 15, savunma: 30, hava: 5, dribling: 20, sut: 20, firsat: 10 }
+  },
+  'LM': {
+    'Standart Açık Orta Saha': { pas: 20, savunma: 25, hava: 0, dribling: 30, sut: 10, firsat: 15 },
+    'Ofansif Açık Orta Saha': { pas: 15, savunma: 10, hava: 0, dribling: 35, sut: 15, firsat: 25 },
+    'Açık Oyun Kurucu': { pas: 30, savunma: 10, hava: 0, dribling: 20, sut: 5, firsat: 35 },
+    'Agresif Kanat': { pas: 10, savunma: 45, hava: 5, dribling: 20, sut: 10, firsat: 10 } 
+  },
+  'LW': {
+    'Klasik Kanat': { pas: 15, savunma: 10, hava: 0, dribling: 40, sut: 10, firsat: 25 },
+    'Kanat Forvet': { pas: 15, savunma: 5, hava: 0, dribling: 30, sut: 30, firsat: 20 },
+    'Kanat Oyun Kurucu': { pas: 30, savunma: 10, hava: 0, dribling: 20, sut: 10, firsat: 30 },
+    'Agresif Kanat': { pas: 10, savunma: 45, hava: 5, dribling: 20, sut: 10, firsat: 10 }
+  },
+  'FW': {
+    'Fırsatçı Golcü': { pas: 5, savunma: 0, hava: 20, dribling: 5, sut: 65, firsat: 5 }, 
+    'Hareketli Forvet': { pas: 15, savunma: 5, hava: 0, dribling: 30, sut: 25, firsat: 25 },
+    'Çalışkan Forvet': { pas: 15, savunma: 30, hava: 5, dribling: 20, sut: 15, firsat: 15 },
+    'Pivot Forvet': { pas: 20, savunma: 10, hava: 15, dribling: 10, sut: 25, firsat: 20 },
+    'Sahte 9': { pas: 25, savunma: 5, hava: 0, dribling: 20, sut: 20, firsat: 30 }
+  }
+};
+
+const editor = document.getElementById('editor');
+
+function renderEditor() {
+    editor.innerHTML = '';
+    for (const [pos, roles] of Object.entries(roleWeights)) {
+        const posDiv = document.createElement('div');
+        posDiv.className = 'pos-group';
+        posDiv.innerHTML = `<h3 class="pos-title">${pos} Modelleri</h3>`;
+        
+        for (const [role, stats] of Object.entries(roles)) {
+            const roleDiv = document.createElement('div');
+            roleDiv.className = 'role-item';
+            
+            const statsHtml = Object.keys(stats).map(stat => `
+                <div class="stat-group">
+                    <label>${stat.toUpperCase()}</label>
+                    <input type="number" data-pos="${pos}" data-role="${role}" data-stat="${stat}" value="${stats[stat]}" onchange="updateStat(this)">
+                </div>
+            `).join('');
+
+            roleDiv.innerHTML = `
+                <div class="role-header">
+                    <span>${role}</span>
+                    <span class="total-warning" id="warning-${pos.replace(/\s/g,'')}-${role.replace(/\s/g,'')}"></span>
+                </div>
+                <div class="stat-inputs">${statsHtml}</div>
+            `;
+            posDiv.appendChild(roleDiv);
+        }
+        editor.appendChild(posDiv);
+    }
+    updateAllWarnings();
+}
+
+window.updateStat = function(input) {
+    const pos = input.getAttribute('data-pos');
+    const role = input.getAttribute('data-role');
+    const stat = input.getAttribute('data-stat');
+    roleWeights[pos][role][stat] = Number(input.value) || 0;
+    updateWarning(pos, role);
+};
+
+function updateWarning(pos, role) {
+    const stats = roleWeights[pos][role];
+    const sum = Object.values(stats).reduce((a, b) => a + b, 0);
+    const warnEl = document.getElementById(`warning-${pos.replace(/\s/g,'')}-${role.replace(/\s/g,'')}`);
+    warnEl.innerText = `Toplam: %${sum}`;
+    warnEl.style.color = sum === 100 ? '#2ecc71' : '#e74c3c';
+}
+
+function updateAllWarnings() {
+    for (const pos in roleWeights) {
+        for (const role in roleWeights[pos]) {
+            updateWarning(pos, role);
+        }
+    }
+}
+
+window.generateJS = function() {
+    const finalWeights = JSON.parse(JSON.stringify(roleWeights));
+    finalWeights['RB'] = finalWeights['LB'];
+    finalWeights['RWB'] = finalWeights['LWB'];
+    finalWeights['RM'] = finalWeights['LM'];
+    finalWeights['RW'] = finalWeights['LW'];
+
+    const out = `// Kondisyon Çarpanları
+export const CONDITIONS = {
+  'Tam': 1.0,
+  'İyi': 0.8,
+  'Vasat': 0.6,
+  'Kötü': 0.4
+};
+
+// Mevki ve Rollere Göre CIES Kriter Ağırlıkları (%)
+export const ROLE_WEIGHTS = ${JSON.stringify(finalWeights, null, 2)};
+
+export const INTERNAL_POS_MAP = {
+  'LCB': 'CB', 'RCB': 'CB',
+  'LDM': 'DM', 'RDM': 'DM',
+  'LCM': 'CM', 'RCM': 'CM',
+  'LAM': 'AM', 'RAM': 'AM',
+  'LFW': 'FW', 'RFW': 'FW'
+};`;
+    
+    const outEl = document.getElementById('outputCode');
+    outEl.style.display = 'block';
+    outEl.value = out;
+    outEl.select();
+    document.execCommand('copy');
+    alert("Kod üretildi ve panoya kopyalandı! Doğrudan constants.js içine yapıştırabilirsiniz.");
+};
+
+renderEditor();
+</script>
+</body>
+</html>
