@@ -46,6 +46,9 @@
     label { font-weight: bold; font-size: 0.9em; display: block; margin-top: 10px; color: var(--text-main); }
     select, input[type="text"], input[type="number"] { width: 100%; padding: 8px; margin-top: 5px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; background: var(--bg-input); color: var(--text-main); font-weight: bold; }
     select { padding-right: 25px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+    
+    /* 🔥 KONDİSYON MENÜSÜ RENK DÜZELTMESİ 🔥 */
+    select option { background-color: var(--bg-panel); color: var(--text-main); }
 
     .btn { display: inline-flex; justify-content: center; align-items: center; color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 5px; font-weight: bold; transition: filter 0.2s; box-sizing: border-box; text-align: center; }
     .btn:hover { filter: brightness(1.1); }
@@ -264,7 +267,7 @@
         <div class="stat-box"><label>Hava Topu</label>
             <div class="spinner-wrapper"><button class="spin-btn minus">-</button><input type="number" id="sHava" min="0" max="100" step="5" value="40"><button class="spin-btn plus">+</button></div>
         </div>
-        <div class="stat-box full-width"><label>Şut Karşılama (Sadece GK)</label>
+        <div class="stat-box full-width"><label>Şut Karşılama</label>
             <div class="spinner-wrapper"><button class="spin-btn minus">-</button><input type="number" id="sSutKar" min="0" max="100" step="5" value="0"><button class="spin-btn plus">+</button></div>
         </div>
       </div>
@@ -277,7 +280,10 @@
       
       <div id="secPosMap" class="pos-map"></div>
 
-      <button id="btnAddPlayer" class="btn btn-green" style="margin-top: 20px;">Oyuncuyu Havuza Ekle</button>
+      <div style="display: flex; gap: 10px; margin-top: 20px;">
+        <button id="btnAddPlayer" class="btn btn-green" style="flex: 2;">Oyuncuyu Havuza Ekle</button>
+        <button id="btnCancelEdit" class="btn btn-dark" style="flex: 1; display: none; background-color: #7f8c8d;">İptal</button>
+      </div>
       
       <div class="btn-group">
         <button id="btnLoadDummies" class="btn btn-dark">Test Verisi Yükle</button>
@@ -290,9 +296,7 @@
       <div class="settings-bar">
         <span style="font-size: 0.9em; color: var(--text-muted); font-weight: bold; margin-right: 5px;">Ayarlar:</span>
         <label class="setting-lbl"><input type="checkbox" id="cbDarkMode" style="margin:0;"> Karanlık Mod</label>
-        <label class="setting-lbl"><input type="checkbox" id="cbHideOvr" style="margin:0;"> OVR Gizle</label>
         <label class="setting-lbl"><input type="checkbox" id="cbLowHava" checked style="margin:0;"> Hava Düşük</label>
-        <label class="setting-lbl"><input type="checkbox" id="cbTeamColors" style="margin:0;"> Takım Renkleri</label>
         <button id="btnRoleManager" class="btn btn-yellow" style="width:auto; padding:6px 12px; margin:0;">Rolleri Düzenle</button>
       </div>
 
@@ -340,11 +344,21 @@
       <div class="player-list" id="playerListEl">Henüz oyuncu eklenmedi.</div>
       
       <div class="controls-container">
-        <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; margin-top: 0;">
-            <input type="checkbox" id="cbForceFill" style="width: auto;"> 
-            Her Zaman Kadro Bul (Boş mevkilere zorunlu adam yerleştir)
-        </label>
-        <div class="btn-group">
+        <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color);">
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; margin-top: 0; font-weight: bold;">
+                <input type="checkbox" id="cbForceFill" style="width: auto; margin:0;"> 
+                Her Zaman Kadro Bul
+            </label>
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; margin-top: 0; font-weight: bold;">
+                <input type="checkbox" id="cbHideOvr" style="width: auto; margin:0;"> 
+                OVR ve Kondisyon Gizle
+            </label>
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; margin-top: 0; font-weight: bold;">
+                <input type="checkbox" id="cbTeamColors" style="width: auto; margin:0;"> 
+                Takım Renkleri
+            </label>
+        </div>
+        <div class="btn-group" style="margin-top: 0;">
             <button id="btnRandomSelect" class="btn btn-purple" style="font-size: 1.1em; padding: 12px;">Rastgele Seç</button>
             <button id="btnRunSim" class="btn" style="background: #a8e63d; color: #0d1b2a; font-size: 1.1em; padding: 12px;">Algoritmayı Çalıştır</button>
         </div>

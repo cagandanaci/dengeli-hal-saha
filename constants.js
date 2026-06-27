@@ -18,12 +18,20 @@ export const ROLE_WEIGHTS = {
       "firsat": 0
     },
     "Libero Kaleci": {
-      "sutKarsilama": 60,
-      "pas": 20,
-      "savunma": 10,
+      "sutKarsilama": 55,
+      "pas": 15,
+      "savunma": 15,
       "hava": 10,
-      "dribling": 0,
+      "dribling": 5,
       "firsat": 0
+    },
+    "Hem Oyuncu Hem Kaleci": {
+      "sutKarsilama": 40,
+      "pas": 20,
+      "savunma": 15,
+      "hava": 10,
+      "dribling": 10,
+      "firsat": 5
     }
   },
   "CB": {
@@ -211,6 +219,14 @@ export const ROLE_WEIGHTS = {
       "hava": 0,
       "dribling": 30,
       "sut": 30,
+      "firsat": 25
+    },
+    "Modern Ofansif Orta Saha": {
+      "pas": 30,
+      "savunma": 10,
+      "hava": 0,
+      "dribling": 20,
+      "sut": 15,
       "firsat": 25
     },
     "Ofansif Oyun Kurucu": {

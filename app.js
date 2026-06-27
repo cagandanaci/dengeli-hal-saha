@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const styleId = 'hide-ovr-style';
         if (!document.getElementById(styleId)) {
             let s = document.createElement('style'); s.id = styleId;
-            s.innerHTML = '.pitch-ovr-text, .cond-icon { display: none !important; }';
+            s.innerHTML = '.pitch-container .pitch-ovr-text, .pitch-container .cond-icon { display: none !important; }';
             document.head.appendChild(s);
         }
     }
@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target.checked) {
             if (!s) {
                 s = document.createElement('style'); s.id = styleId;
-                s.innerHTML = '.pitch-ovr-text, .cond-icon { display: none !important; }';
+                s.innerHTML = '.pitch-container .pitch-ovr-text, .pitch-container .cond-icon { display: none !important; }';
                 document.head.appendChild(s);
             }
         } else { if (s) s.remove(); }
@@ -185,7 +185,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Ana buton olayları
     document.getElementById('btnToggleSelection')?.addEventListener('click', (e) => { 
         e.preventDefault(); 
         const allSelected = currentPlayers.length > 0 && currentPlayers.every(p => p.selected);
@@ -212,11 +211,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnExportJSON')?.addEventListener('click', exportDatabases);
     document.getElementById('btnImportJSON')?.addEventListener('click', importDatabases);
     document.getElementById('btnAddPlayer')?.addEventListener('click', handleAddPlayer);
+    document.getElementById('btnCancelEdit')?.addEventListener('click', cancelEdit);
     document.getElementById('btnRunSim')?.addEventListener('click', runSimulation);
     document.getElementById('pMainPos')?.addEventListener('change', () => { renderPositionMap(); updateLiveRoles(); });
     document.getElementById('matchFormat')?.addEventListener('change', updatePlayerList);
 
-    // Global tıklama olayları
     document.addEventListener('click', (e) => {
         const pitchNode = e.target.closest('.pitch-node-clickable');
         if (pitchNode) {
@@ -328,10 +327,6 @@ function checkRmSum() {
     warning.innerText = `Toplam Ağırlık: %${sum} ${sum !== 100 ? '(Genelde 100 olması önerilir)' : ''}`;
     warning.style.color = sum === 100 ? '#2ecc71' : '#e74c3c';
 }
-
-// ----------------------------------------------------
-// 🔥 VERİTABANI VE TEST FONKSİYONLARI 🔥
-// ----------------------------------------------------
 
 function loadDummies(e) {
     if (e) e.preventDefault();
@@ -497,40 +492,59 @@ function selectRandomPlayers(e) {
     updatePlayerList(); 
 }
 
-// ----------------------------------------------------
-// UI VE HESAPLAMA FONKSİYONLARI
-// ----------------------------------------------------
-
-function getOvrForPosition(player, pos, role, capacity) {
+function getOvrForPosition(player, pos, role, capacity, applyCondition = false) {
     const basePos = getBasePosition(pos);
     if (player.bannedPositions && player.bannedPositions.includes(basePos)) return 0;
+    
     const weights = ROLE_WEIGHTS[basePos]?.[role];
     const getStat = s => player.stats[s] ?? (s === 'sut' ? player.stats.şut : s === 'firsat' ? player.stats.fırsat : 0);
+    const condMulti = applyCondition ? (CONDITIONS[player.condition] || 1.0) : 1.0;
+    
     let baseOvr = 0;
+    
     if (weights) {
         let ts = 0, tw = 0;
-        for (const [s, w] of Object.entries(weights)) { if (w > 0) { ts += getStat(s) * w; tw += w; } }
+        for (const [s, w] of Object.entries(weights)) { 
+            if (w > 0) { 
+                let currentCond = condMulti;
+                if (basePos === 'GK' && !['savunma', 'dribling', 'hava'].includes(s)) {
+                    currentCond = 1.0;
+                }
+                ts += (getStat(s) * currentCond) * w; 
+                tw += w; 
+            } 
+        }
         if (tw > 0) baseOvr = Math.round(ts / tw);
     } else {
-        baseOvr = Math.round(((player.stats.pas || 0) + (player.stats.savunma || 0) + (player.stats.dribling || 0) + (player.stats.hava || 0) + getStat('firsat') + (basePos === 'GK' ? player.stats.sutKarsilama || 0 : getStat('sut'))) / 6);
+        let sSut = basePos === 'GK' ? player.stats.sutKarsilama || 0 : getStat('sut');
+        baseOvr = Math.round(((player.stats.pas || 0)*condMulti + (player.stats.savunma || 0)*condMulti + (player.stats.dribling || 0)*condMulti + (player.stats.hava || 0)*condMulti + getStat('firsat')*condMulti + sSut*condMulti) / 6);
     }
+    
     return Math.round(baseOvr * (capacity / 100));
 }
 
-function getEffectivePlayerInfo(player) {
+function getEffectivePlayerInfo(player, applyCondition = false) {
     const mainPos = player.mainPos;
     const mainBase = getBasePosition(mainPos);
     const banned = player.bannedPositions || [];
     const isMainBanned = banned.includes(mainPos) || banned.includes(mainBase);
 
-    if (!isMainBanned) return { original: mainPos, active: mainPos, activeRole: player.role, ovr: getOvrForPosition(player, mainPos, player.role, 100), isBanned: false };
+    if (!isMainBanned) {
+        return { 
+            original: mainPos, 
+            active: mainPos, 
+            activeRole: player.role, 
+            ovr: getOvrForPosition(player, mainPos, player.role, 100, applyCondition), 
+            isBanned: false 
+        };
+    }
 
     let bestSec = null; let bestRole = null; let bestOvr = -1;
     if (player.secondaryPositions && player.secondaryPositions.length > 0) {
         player.secondaryPositions.forEach(sp => {
             const spBase = getBasePosition(sp.pos);
             if (!banned.includes(sp.pos) && !banned.includes(spBase)) {
-                const ovr = getOvrForPosition(player, sp.pos, sp.role, sp.capacity);
+                const ovr = getOvrForPosition(player, sp.pos, sp.role, sp.capacity, applyCondition);
                 if (ovr > bestOvr) { bestOvr = ovr; bestSec = sp.pos; bestRole = sp.role; }
             }
         });
@@ -558,7 +572,7 @@ function openPlayerModal(info) {
             <b>Mevki:</b> ${info.basePos} | 
             <b>Rol:</b> <span style="color:#2ecc71;">${info.role}</span> <br>
             <b>Mevki Kapasitesi:</b> <span style="color:${info.cap===100?'#2ecc71':(info.cap>50?'#f39c12':'#e74c3c')};">%${info.cap}</span> | 
-            <b>Kondisyon:</b> <span class="cond-icon" style="margin-right:5px;">${window.getConditionHeart(info.cond)}</span> ${info.cond} (Çarpan: x${condMulti})
+            <b>Kondisyon:</b> <span style="margin-right:5px;">${window.getConditionHeart(info.cond)}</span> ${info.cond} (Çarpan: x${condMulti})
         </div>
         <div style="font-weight:bold; color:#f39c12; margin-bottom:10px;">Takım Dengesine Bireysel Katkı Analizi:</div>
         <table class="sim-stat-table" style="width:100%; text-align:left; border-collapse:collapse; font-size:0.95em;">
@@ -574,12 +588,19 @@ function openPlayerModal(info) {
     for (const [stat, weight] of Object.entries(info.weights)) {
         if (weight > 0) {
             const raw = info.stats[stat] || 0;
-            const currentCondMulti = stat === 'sutKarsilama' ? 1.0 : condMulti;
+            
+            // 🔥 HANGİ ÖZELLİKLER ETKİLENMİYOR? 🔥
+            // Eğer oyuncu GK olarak sahaya çıkıyorsa ve özellik Savunma, Dribling, Hava DEĞİLSE kondisyondan muaf olur.
+            const isExempt = info.basePos === 'GK' && !['savunma', 'dribling', 'hava'].includes(stat);
+            const currentCondMulti = isExempt ? 1.0 : condMulti;
+            
             const effective = raw * (weight/100) * (info.cap/100) * currentCondMulti;
             totalContrib += effective;
             
             const statName = statLabels[stat] || stat;
-            const shieldNote = (stat === 'sutKarsilama' && condMulti !== 1.0) ? `<br><span style="font-size:0.7em; color:#f39c12;">(Kondisyondan Etkilenmez)</span>` : ``;
+            
+            // Etkilenmeyen tüm özelliklerin (Pas, Fırsat, Şut, ŞutK) altına uyarı ekleniyor
+            const shieldNote = (isExempt && condMulti !== 1.0) ? `<br><span style="font-size:0.7em; color:#f39c12;">(Kondisyondan Etkilenmez)</span>` : ``;
 
             detailsHtml += `<tr>
                 <td style="padding:8px; font-weight:bold;">${statName}</td>
@@ -628,11 +649,11 @@ function generateMiniPitchHTML(player, width = "140px") {
             bgColor = '#c0392b'; border = '1px solid white'; content = 'X'; size = 20; zIndex = 10; opacity = 1;
             tooltipText = `<b>${pos}</b> <span style="color:#e74c3c;">(Yasaklı)</span>`;
         } else if (isMain) {
-            const ovr = getOvrForPosition(player, pos, mainRole, 100);
+            const ovr = getOvrForPosition(player, pos, mainRole, 100, false);
             bgColor = '#00d2d3'; border = '2px solid white'; content = pos; size = 24; zIndex = 8; opacity = 1;
             tooltipText = `<b>${pos} (Ana)</b><br><span style="color:#f39c12;">${mainRole || 'Rol Seçilmedi'}</span><br><span style="color:${window.getStatColor(ovr)};">${ovr} OVR</span>`;
         } else if (isSec) {
-            const ovr = getOvrForPosition(player, pos, secObj.role, secObj.capacity);
+            const ovr = getOvrForPosition(player, pos, secObj.role, secObj.capacity, false);
             bgColor = secObj.capacity === 100 ? '#00d2d3' : `hsl(${Math.floor((secObj.capacity / 100) * 120)}, 80%, 45%)`;
             border = '1px solid white'; content = pos; size = 20; zIndex = 7; opacity = 1;
             tooltipText = `<b>${pos} (Yan) - %${secObj.capacity}</b><br><span style="color:#f39c12;">${secObj.role || 'Rol Seçilmedi'}</span><br><span style="color:${window.getStatColor(ovr)};">${ovr} OVR</span>`;
@@ -658,10 +679,6 @@ function generateMiniPitchHTML(player, width = "140px") {
         </div>`;
 }
 
-// ----------------------------------------------------
-// 🔥 SİMÜLASYON, PITCH VE LİSTE GÜNCELLEMELERİ 🔥
-// ----------------------------------------------------
-
 function generateTacticalPitchHTML(lineup, title, teamColor = '#00d2d3', teamType = 'A') {
     if (!lineup) return '';
     
@@ -680,9 +697,8 @@ function generateTacticalPitchHTML(lineup, title, teamColor = '#00d2d3', teamTyp
     lineup.lineup.forEach(item => {
         if (!item.player) return;
         
+        const activeOvr = getOvrForPosition(item.player, item.slot, item.role, item.cap, true);
         const weights = ROLE_WEIGHTS[item.basePos]?.[item.role] || {};
-        const condMulti = CONDITIONS[item.player.condition] || 1.0;
-        const activeOvr = Math.round(item.pOvr * condMulti);
         
         const pinfo = { cond: item.player.condition, basePos: item.basePos, role: item.role, cap: item.cap, weights: weights, stats: item.player.stats, name: item.player.name, pOvr: item.pOvr };
         const encodedInfo = encodeURIComponent(JSON.stringify(pinfo));
@@ -696,7 +712,6 @@ function generateTacticalPitchHTML(lineup, title, teamColor = '#00d2d3', teamTyp
             warningIcon = `<div class="pitch-player-alert" style="position:absolute; top:-8px; right:-8px; font-size:16px; text-shadow: 1px 1px 2px #000; z-index: 10;">⚠️</div>`; 
             circleColor = '#e74c3c'; 
         } else if (useTeamColors) {
-            // A Takımı yuvarlakları her zaman Koyu Mavi, B takımı Kırmızı. (85+ kuralı sadece yazıda)
             circleColor = teamType === 'A' ? '#3498db' : '#e74c3c'; 
         } else {
             if (item.isMain || (item.isSec && item.cap === 100)) { circleColor = '#00d2d3'; } 
@@ -705,7 +720,6 @@ function generateTacticalPitchHTML(lineup, title, teamColor = '#00d2d3', teamTyp
 
         const nameColor = item.player.isTest ? '#2ecc71' : 'white';
         
-        // Aktif OVR hesabı ve Kalp dahil edildi (FM Tarzı)
         playersHTML += `
             <div class="pitch-player" data-pinfo="${encodedInfo}" style="position: absolute; left: ${posData.x}%; top: ${posData.y}%; z-index: 5;">
                 <div class="pitch-player-icon" style="background-color: ${circleColor};">${warningIcon}</div>
@@ -760,10 +774,14 @@ function updatePlayerList() {
             html += pList.map(p => {
                 const nameColor = p.isTest ? '#2ecc71' : 'inherit'; 
                 const displayNameHtml = p.shortName?.trim() ? ` <span style="color:var(--text-muted); font-size:0.85em;">(${p.shortName.trim()})</span>` : '';
+                const condHeart = window.getConditionHeart(p.condition);
                 
-                const eff = getEffectivePlayerInfo(p);
-                const posDisplay = eff.isBanned ? `<s style="color:#e74c3c;">${eff.original}</s> <span style="color:#e67e22; font-size:0.9em; font-weight:bold;">(En iyi mevki: ${eff.active})</span>` : `${eff.original}`;
-                const roleDisplay = eff.isBanned && eff.active !== 'Yok' ? `<span style="color:#1a6b2e;">(${eff.activeRole})</span>` : `<span style="color:#1a6b2e;">(${p.role})</span>`;
+                const effBase = getEffectivePlayerInfo(p, false);
+                const effActive = getEffectivePlayerInfo(p, true);
+                
+                // 🔥 SENİN DÜZELTTİĞİN KISIM EKLENDİ (Büyük harf "En İyi Mevki") 🔥
+                const posDisplay = effBase.isBanned ? `<s style="color:#e74c3c;">${effBase.original}</s> <span style="color:#e67e22; font-size:0.9em; font-weight:bold;">(En İyi Mevki: ${effBase.active})</span>` : `${effBase.original}`;
+                const roleDisplay = effBase.isBanned && effBase.active !== 'Yok' ? `<span style="color:#1a6b2e;">(${effBase.activeRole})</span>` : `<span style="color:#1a6b2e;">(${p.role})</span>`;
 
                 const havaVal = p.stats.hava||0; const pasVal = p.stats.pas||0; const savVal = p.stats.savunma||0;
                 const sutVal = getBasePosition(p.mainPos)==='GK'?(p.stats.sutKarsilama||0):(p.stats.sut ?? (p.stats.şut||0));
@@ -784,13 +802,9 @@ function updatePlayerList() {
                     ? p.secondaryPositions.map(sp => `<span class="badge" style="background:${window.getStatColor(sp.capacity === 100 ? 85 : (sp.capacity>50?65:30))};">${sp.pos} (%${sp.capacity})</span>`).join('') 
                     : '<span style="font-size:0.85em; color:var(--text-muted);">Yok</span>';
 
-                const condMulti = CONDITIONS[p.condition] || 1.0;
-                const activeOvr = Math.round(eff.ovr * condMulti);
-                const condHeart = `<span class="cond-icon">${window.getConditionHeart(p.condition, 18)}</span>`;
-                
-                let ovrBadgeText = `${eff.ovr} OVR`;
-                if (condMulti < 1.0) {
-                    ovrBadgeText = `${eff.ovr} OVR (Aktif: ${activeOvr})`;
+                let ovrBadgeText = `${effBase.ovr} OVR`;
+                if (effBase.ovr !== effActive.ovr) {
+                    ovrBadgeText = `${effBase.ovr} OVR (Aktif: ${effActive.ovr})`;
                 }
 
                 return `
@@ -799,7 +813,7 @@ function updatePlayerList() {
                     <div style="display: flex; align-items: center; gap: 10px;">
                       <input type="checkbox" class="player-select-cb" data-id="${p.id}" ${p.selected ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer;">
                       <span style="${p.selected ? '' : 'text-decoration:line-through; opacity:0.5;'}">
-                        <b style="color:${nameColor};">${p.name}</b>${displayNameHtml} ${condHeart} <span class="pitch-ovr-text" style="background:${window.getStatColor(activeOvr)}; color:white; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding:2px 6px; border-radius:4px; font-size:0.8em; margin-left:4px;">${ovrBadgeText}</span> | ${posDisplay} ${roleDisplay}
+                        <b style="color:${nameColor};">${p.name}</b>${displayNameHtml} <span class="cond-icon">${condHeart}</span> <span class="pitch-ovr-text" style="background:${window.getStatColor(effBase.ovr)}; color:white; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding:2px 6px; border-radius:4px; font-size:0.8em; margin-left:4px;">${ovrBadgeText}</span> | ${posDisplay} ${roleDisplay}
                       </span>
                     </div>
                   </summary>
@@ -911,6 +925,9 @@ function handleAddPlayer(e) {
     ['pName', 'pLastName', 'pShortName'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = ""; });
     
     document.querySelectorAll('.pos-btn-group.active-sec').forEach(btn => btn.classList.remove('active-sec'));
+    
+    const btnCancel = document.getElementById('btnCancelEdit');
+    if (btnCancel) btnCancel.style.display = 'none';
     
     renderPositionMap(); updatePlayerList();
 }
@@ -1161,6 +1178,7 @@ function runSimulation(e) {
                                 </tr>
                             </thead>
                             <tbody>
+                                ${renderStatRow('Genel Güç (OVR)', trueStatsA.totalOvr, trueStatsB.totalOvr, diffs.ovr)}
                                 ${renderStatRow('Hava Topu', trueStatsA.hava, trueStatsB.hava, diffs.hava)}
                                 ${renderStatRow('Pas D.', trueStatsA.pas, trueStatsB.pas, diffs.pas)}
                                 ${renderStatRow('Savunma', trueStatsA.savunma, trueStatsB.savunma, diffs.savunma)}
@@ -1260,10 +1278,17 @@ function renderRadarChart(playerId) {
     if (chartInstances[playerId]) return; 
     const player = currentPlayers.find(p => p.id === playerId); if(!player) return;
     const canvas = document.getElementById(`chart-${playerId}`); if(!canvas) return;
+    
+    // Etkili (Aktif) rolün GK olup olmadığını kontrol ediyoruz
+    const eff = getEffectivePlayerInfo(player, false);
+    const isActiveGK = getBasePosition(eff.active) === 'GK';
+
     const sutValue = player.stats.sut !== undefined ? player.stats.sut : (player.stats.şut || 0);
+    const sutKValue = player.stats.sutKarsilama || 0;
     const firsatValue = player.stats.firsat !== undefined ? player.stats.firsat : (player.stats.fırsat || 0);
-    const labels = player.mainPos === 'GK' ? ['Pas D.', 'Savunma', 'Şut K.', 'Dribling', 'Fırsat Y.', 'Hava'] : ['Pas D.', 'Savunma', 'Şut', 'Dribling', 'Fırsat Y.', 'Hava'];
-    const data = player.mainPos === 'GK' ? [player.stats.pas, player.stats.savunma, player.stats.sutKarsilama, player.stats.dribling, firsatValue, player.stats.hava] : [player.stats.pas, player.stats.savunma, sutValue, player.stats.dribling, firsatValue, player.stats.hava];
+    
+    const labels = isActiveGK ? ['Pas D.', 'Savunma', 'Şut K.', 'Dribling', 'Fırsat Y.', 'Hava'] : ['Pas D.', 'Savunma', 'Şut', 'Dribling', 'Fırsat Y.', 'Hava'];
+    const data = isActiveGK ? [player.stats.pas, player.stats.savunma, sutKValue, player.stats.dribling, firsatValue, player.stats.hava] : [player.stats.pas, player.stats.savunma, sutValue, player.stats.dribling, firsatValue, player.stats.hava];
     
     chartInstances[playerId] = new Chart(canvas.getContext('2d'), { 
         type: 'radar', 
@@ -1321,5 +1346,47 @@ function editPlayer(id) {
     updateCondPreview(); 
     const btn = document.getElementById('btnAddPlayer'); 
     if (btn) { btn.innerText = "Düzenlemeyi Kaydet ✓"; btn.className = "btn btn-green"; }
+    
+    const btnCancel = document.getElementById('btnCancelEdit');
+    if (btnCancel) btnCancel.style.display = 'block';
+    
     const details = document.getElementById(`details-${id}`); if(details) details.open = false; window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelEdit(e) {
+    if(e) e.preventDefault();
+    editingPlayerId = null;
+    
+    const safeSet = (elemId, val) => { const el = document.getElementById(elemId); if (el) el.value = val; };
+    
+    // Formu varsayılan değerlerine sıfırla
+    safeSet('pName', "");
+    safeSet('pLastName', "");
+    safeSet('pShortName', "");
+    safeSet('pMainPos', "CB");
+    safeSet('pCond', "Tam");
+    safeSet('sPas', 80);
+    safeSet('sSavunma', 50);
+    safeSet('sSut', 70);
+    safeSet('sDribling', 85);
+    safeSet('sFirsat', 90);
+    safeSet('sHava', 40);
+    safeSet('sSutKar', 0);
+
+    // Yan mevkileri ve manuel rol seçimlerini temizle
+    document.querySelectorAll('.pos-btn-group.active-sec').forEach(btn => btn.classList.remove('active-sec'));
+    const mainGroup = document.querySelector(`.pos-btn-group.main-pos`);
+    if (mainGroup) delete mainGroup.dataset.manual;
+
+    // Butonları eski haline getir
+    const btn = document.getElementById('btnAddPlayer'); 
+    if(btn) { btn.innerText = "Oyuncuyu Havuza Ekle"; btn.className = "btn btn-green"; }
+    
+    const btnCancel = document.getElementById('btnCancelEdit');
+    if(btnCancel) btnCancel.style.display = 'none';
+
+    // Arayüzü tazele
+    renderPositionMap(); 
+    updateLiveRoles();
+    updateCondPreview();
 }

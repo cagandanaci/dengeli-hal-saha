@@ -22,7 +22,8 @@ export function getBestRoleForStats(pos, stats) {
 }
 
 export function calculateTeamStatsLineup(lineupArr) {
-  let stats = { pas: 0, savunma: 0, sut: 0, dribling: 0, firsat: 0, hava: 0 };
+  let stats = { pas: 0, savunma: 0, sut: 0, dribling: 0, firsat: 0, hava: 0, totalOvr: 0 };
+  let maxStats = { pas: 0, savunma: 0, sut: 0, dribling: 0, firsat: 0, hava: 0 }; // 🔥 Sabit tavanlar yerine Dinamik Potansiyel
 
   lineupArr.forEach(item => {
     if (item.invalid || !item.player) return; 
@@ -32,59 +33,89 @@ export function calculateTeamStatsLineup(lineupArr) {
     
     const kapasiteCarpani = item.cap / 100;
     const kondisyonCarpani = CONDITIONS[p.condition] || 1.0;
+    
+    // Takımın toplam OVR havuzuna katkısı
+    stats.totalOvr += item.pOvr * kondisyonCarpani;
+
     const weights = ROLE_WEIGHTS[item.basePos]?.[role] || {};
 
     ['pas', 'savunma', 'sut', 'dribling', 'firsat', 'hava'].forEach(statName => {
         let hamStat = p.stats[statName] || 0;
         let rolAgirligi = weights[statName] || 0;
 
-        if (statName === 'savunma' && item.basePos === 'GK') {
-             rolAgirligi = weights['sutKarsilama'] || 0;
-             hamStat = p.stats['sutKarsilama'] || 0;
+        // Kalecilerde Kondisyon Sadece Savunma, Dribling ve Hava Topunu Etkiler
+        let sonKondisyon = kondisyonCarpani;
+        if (item.basePos === 'GK' && !['savunma', 'dribling', 'hava'].includes(statName)) {
+            sonKondisyon = 1.0;
         }
 
-        const sonKondisyon = (statName === 'savunma' && item.basePos === 'GK') ? 1.0 : kondisyonCarpani;
-        const oyuncuKatkisi = hamStat * (rolAgirligi / 100) * kapasiteCarpani * sonKondisyon;
+        // Oyuncunun mevcut yeteneğiyle takıma kattığı
+        let oyuncuKatkisi = hamStat * (rolAgirligi / 100) * kapasiteCarpani * sonKondisyon;
         
-        stats[statName] += oyuncuKatkisi; 
+        // Eğer oyuncunun o özelliği 100 olsaydı takıma katacağı (Tavanı belirliyoruz)
+        let maxKatki = 100 * (rolAgirligi / 100) * kapasiteCarpani * sonKondisyon;
+
+        // 🔥 KALECİ ÖZEL: Şut kurtarmanın takıma %50 savunma katkısı vermesi
+        if (statName === 'savunma' && item.basePos === 'GK') {
+            const sutKarAgirlik = weights['sutKarsilama'] || 0;
+            const sutKarStat = p.stats['sutKarsilama'] || 0;
+            
+            const sutKarKatkisi = sutKarStat * (sutKarAgirlik / 100) * kapasiteCarpani * 1.0 * 0.5; // %50 Etki
+            const sutKarMax = 100 * (sutKarAgirlik / 100) * kapasiteCarpani * 1.0 * 0.5;
+
+            oyuncuKatkisi += sutKarKatkisi;
+            maxKatki += sutKarMax;
+        }
+
+        stats[statName] += oyuncuKatkisi;
+        maxStats[statName] += maxKatki;
     });
   });
 
-  const IDEAL_MAX_HACIM = { savunma: 2.65, pas: 1.05, sut: 0.90, dribling: 0.95, firsat: 0.85, hava: 0.50 };
-
+  // Takımın ulaştığı gücü, o dizilişte ulaşabileceği MİLYARLIK tavana bölüp % olarak 100 üzerinden hesaplıyoruz.
   ['pas', 'savunma', 'sut', 'dribling', 'firsat', 'hava'].forEach(c => {
-    stats[c] = Math.min(100, stats[c] / IDEAL_MAX_HACIM[c]);
+    if (maxStats[c] > 0) {
+        stats[c] = (stats[c] / maxStats[c]) * 100;
+    } else {
+        stats[c] = 0;
+    }
   });
 
   return stats;
 }
 
 export function calculateBalanceMetrics(statsA, statsB, invalidCountA, invalidCountB) {
+  // Artık değerler 0.8 veya 1.2 değil, 85.5 veya 92.3 gibi 100'lük sistemde.
   const dSav = statsA.savunma - statsB.savunma;
   const dPas = statsA.pas - statsB.pas;
   const dSut = statsA.sut - statsB.sut;
   const dDrib = statsA.dribling - statsB.dribling;
   const dFir = statsA.firsat - statsB.firsat;
   const dHav = statsA.hava - statsB.hava;
+  const dOvr = statsA.totalOvr - statsB.totalOvr; 
   
-  const diffs = { pas: dPas, savunma: dSav, sut: dSut, dribling: dDrib, firsat: dFir, hava: dHav };
+  const diffs = { pas: dPas, savunma: dSav, sut: dSut, dribling: dDrib, firsat: dFir, hava: dHav, ovr: dOvr };
 
   let penaltyScore = 0;
-  const pw = 20.0; 
+  
+  // 100'lük sisteme geçtiğimiz için çarpan ağırlıklarını optimize ettik
+  const pw = 5.0; 
   
   penaltyScore += (dSav * dSav) * pw;  
   penaltyScore += (dPas * dPas) * pw;   
   penaltyScore += (dSut * dSut) * pw;
   penaltyScore += (dDrib * dDrib) * pw;
   penaltyScore += (dFir * dFir) * pw;
-  
-  // Hava Topu Ceza İndirimi (Aşırı düşürüldü)
-  penaltyScore += (dHav * dHav) * (window.HAVA_LOW_PRIORITY ? (pw / 200) : pw); 
+  penaltyScore += (dHav * dHav) * (window.HAVA_LOW_PRIORITY ? (pw / 5) : pw); 
 
+  // Radarda herhangi bir stat %10'dan fazla fark atıyorsa cezayı katla
   const maxDiff = Math.max( Math.abs(dSav), Math.abs(dPas), Math.abs(dSut), Math.abs(dDrib), Math.abs(dFir), Math.abs(dHav) );
-  if (maxDiff > 4) {
-      penaltyScore += (maxDiff * maxDiff * maxDiff) * 15.0; 
+  if (maxDiff > 10) {
+      penaltyScore += (maxDiff * maxDiff) * 10.0; 
   }
+
+  // 🔥 Toplam OVR Farkı Cezası (Takım güçlerinin denkliği için devasa öneme sahip)
+  penaltyScore += (dOvr * dOvr) * 50.0;
 
   penaltyScore += (invalidCountA + invalidCountB) * 1000000;
 
@@ -175,15 +206,37 @@ export function getAllSquads(players, format, forceFill, havaLowPriority = true)
       bestA.stats = statsA;
       bestB.stats = statsB;
 
+      // 1. Taktiksel Stat Farkı (Yüzdelik) + Toplam OVR Farkı Cezası
       const metrics = calculateBalanceMetrics(statsA, statsB, bestA.invalidCount, bestB.invalidCount);
 
       if (metrics.penaltyScore > 500000 && !forceFill) continue;
+
+      // 🔥 2. BİREBİR OYUNCU EŞLEŞTİRME (DAĞILIM) CEZASI 🔥
+      // Takımlardaki oyuncuları en iyiden en kötüye sıralayıp karşılıklı denk olup olmadıklarına bakıyoruz.
+      const getActiveOvr = (item) => {
+          if (!item || !item.player) return 0;
+          const condMulti = CONDITIONS[item.player.condition] || 1.0;
+          return Math.round(item.pOvr * condMulti);
+      };
+
+      const ovrsA = bestA.lineup.map(getActiveOvr).sort((a, b) => b - a);
+      const ovrsB = bestB.lineup.map(getActiveOvr).sort((a, b) => b - a);
+
+      let distributionPenalty = 0;
+      for(let i = 0; i < ovrsA.length; i++) {
+          const diff = Math.abs(ovrsA[i] - ovrsB[i]);
+          distributionPenalty += (diff * diff) * 10; 
+      }
+
+      const finalPenalty = metrics.penaltyScore + distributionPenalty;
 
       validResults.push({
           squad: { teamA, teamB, metrics },
           lineupA: bestA,
           lineupB: bestB,
-          penalty: metrics.penaltyScore
+          penalty: finalPenalty, 
+          rawPenalty: finalPenalty, 
+          quality: statsA.totalOvr + statsB.totalOvr
       });
   }
 
