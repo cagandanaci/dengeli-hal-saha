@@ -283,10 +283,10 @@ export const ROLE_WEIGHTS = {
     },
     "Kanat Forvet": {
       "pas": 15,
-      "savunma": 5,
+      "savunma": 10,
       "hava": 0,
       "dribling": 30,
-      "sut": 30,
+      "sut": 25,
       "firsat": 20
     },
     "Kanat Oyun Kurucu": {
@@ -316,8 +316,8 @@ export const ROLE_WEIGHTS = {
       "firsat": 5
     },
     "Hareketli Forvet": {
-      "pas": 15,
-      "savunma": 5,
+      "pas": 10,
+      "savunma": 10,
       "hava": 0,
       "dribling": 30,
       "sut": 25,
@@ -453,10 +453,10 @@ export const ROLE_WEIGHTS = {
     },
     "Kanat Forvet": {
       "pas": 15,
-      "savunma": 5,
+      "savunma": 10,
       "hava": 0,
       "dribling": 30,
-      "sut": 30,
+      "sut": 25,
       "firsat": 20
     },
     "Kanat Oyun Kurucu": {

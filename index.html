@@ -19,7 +19,7 @@
       
       --btn-green: #27ae60;
       --btn-red: #e74c3c;
-      --btn-blue: #2980b9;
+      --btn-blue: #3498db;
       --btn-purple: #8e44ad;
       --btn-yellow: #f39c12;
       --btn-dark: #1a252f;
@@ -102,7 +102,6 @@
     .result-box { background: var(--bg-input); padding: 15px; margin-top: 15px; border-radius: 5px; font-family: monospace; line-height: 1.4; border: 1px solid var(--border-color); color: var(--text-main); }
     .sim-result-card { background: var(--bg-panel); border: 1px solid var(--border-color); border-left: 6px solid #a8e63d; border-radius: 8px; padding: 20px; margin-bottom: 25px; overflow-x: auto; }
     
-    /* YENİ: Mobilde daha rahat kontrol için özel classlar */
     .sim-table-chart-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; padding: 15px; border-radius: 8px; background: var(--bg-detail); margin-top: 15px; }
     .sim-table-wrap { flex: 1; min-width: 300px; overflow-x: auto; }
     .sim-chart-wrap { position: relative; width: 100%; max-width: 280px; aspect-ratio: 1/1; display: flex; justify-content: center; margin: 0 auto; }
@@ -114,7 +113,7 @@
     .sim-log-details { background: var(--bg-input); margin-top: 15px; border-radius: 6px; padding: 10px; cursor: pointer; border: 1px solid var(--border-color); }
     .sim-log-content { color: var(--text-muted); margin-top: 15px; padding-top: 10px; border-top: 1px dashed var(--border-color); font-size: 0.9em; line-height: 1.6; font-family: monospace; }
 
-    .pitch-wrapper { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; width: 100%; margin-bottom: 10px; }
+    .pitch-wrapper { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; width: 100%; margin-bottom: 20px; }
     .pitch-container { flex: 1 1 45%; min-width: 280px; max-width: 550px; border: 2px solid var(--border-color); border-radius: 8px; padding: 15px; box-sizing: border-box; background: var(--bg-panel); }
     .pitch-inner { position: relative; width: 100%; aspect-ratio: 1/1.7; background: var(--pitch-bg); border: 2px solid rgba(255,255,255,0.7); border-radius: 4px; overflow: hidden; box-shadow: inset 0 0 20px rgba(0,0,0,0.3); }
     .pitch-player { position: absolute; z-index: 5; cursor: pointer; transition: transform 0.2s; }
@@ -132,7 +131,6 @@
     .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:100000; justify-content:center; align-items:center; }
     .modal-content { background:var(--bg-panel); padding:20px; border-radius:8px; color:var(--text-main); border: 1px solid var(--border-color); box-shadow: 0 5px 15px rgba(0,0,0,0.5); position:relative; }
 
-    /* YENİ: MOBİL UYUMLULUK VE DAR EKRAN KORUMALARI */
     @media (max-width: 900px) {
         body { padding: 8px; }
         .container { flex-direction: column; gap: 10px; }
@@ -155,13 +153,11 @@
         .pd-col-pitch { width: 100%; max-width: 250px; }
         .sec-pos-badges { justify-content: flex-start; }
         
-        /* Mobil Saha ve Oyuncu İkonları */
         .pitch-wrapper { flex-direction: column; }
         .pitch-container { flex: 1 1 100%; min-width: 100%; max-width: 100%; padding: 10px; }
         .pitch-player-icon { width: 22px !important; height: 22px !important; }
         .pitch-player-label { top: 12px !important; min-width: 45px !important; font-size: 0.8em !important; }
         
-        /* Mobil Tablo ve Grafikler */
         .sim-table-chart-wrap { flex-direction: column; padding: 8px; gap: 15px; }
         .sim-table-wrap { min-width: 100%; }
         .sim-chart-wrap { max-width: 100%; height: 250px; }
@@ -273,7 +269,7 @@
         </div>
       </div>
 
-      <label>Yan Mevkiler (Kapasite Oranını Seçin):</label>
+      <label>Yan Mevkiler (Mevkideki Rolünü & Mevki Kapasitesini Seçin):</label>
       <div id="livePitchWrap" style="display: flex; flex-direction: column; align-items: center; background: var(--bg-input); padding: 15px; border-radius: 6px; box-sizing: border-box;">
         <span style="color:#1a6b2e; font-weight:bold; margin-bottom:10px; font-size:0.9em;">📍 Oyuncu Mevki Haritası (Canlı)</span>
         <div id="livePitchContainer"></div>
@@ -285,34 +281,34 @@
       
       <div class="btn-group">
         <button id="btnLoadDummies" class="btn btn-dark">Test Verisi Yükle</button>
-        <button id="btnRemoveDummies" class="btn btn-red">🗑️ Testleri Sil</button>
+        <button id="btnRemoveDummies" class="btn btn-red">Testleri Sil</button>
       </div>
     </div>
 
     <div class="panel right-panel">
       
       <div class="settings-bar">
-        <span style="font-size: 0.9em; color: var(--text-muted); font-weight: bold; margin-right: 5px;">⚙️ Ayarlar:</span>
-        <label class="setting-lbl"><input type="checkbox" id="cbDarkMode" style="margin:0;"> 🌙 Karanlık Mod</label>
-        <label class="setting-lbl"><input type="checkbox" id="cbHideOvr" style="margin:0;"> 🙈 OVR Gizle</label>
-        <label class="setting-lbl"><input type="checkbox" id="cbLowHava" checked style="margin:0;"> 🔽 Hava Düşük</label>
-        <label class="setting-lbl"><input type="checkbox" id="cbTeamColors" style="margin:0;"> 👕 Takım Renkleri</label>
-        <button id="btnRoleManager" class="btn btn-yellow" style="width:auto; padding:6px 12px; margin:0;">🛠️ Rolleri Düzenle</button>
+        <span style="font-size: 0.9em; color: var(--text-muted); font-weight: bold; margin-right: 5px;">Ayarlar:</span>
+        <label class="setting-lbl"><input type="checkbox" id="cbDarkMode" style="margin:0;"> Karanlık Mod</label>
+        <label class="setting-lbl"><input type="checkbox" id="cbHideOvr" style="margin:0;"> OVR Gizle</label>
+        <label class="setting-lbl"><input type="checkbox" id="cbLowHava" checked style="margin:0;"> Hava Düşük</label>
+        <label class="setting-lbl"><input type="checkbox" id="cbTeamColors" style="margin:0;"> Takım Renkleri</label>
+        <button id="btnRoleManager" class="btn btn-yellow" style="width:auto; padding:6px 12px; margin:0;">Rolleri Düzenle</button>
       </div>
 
       <div class="db-container">
-        <div style="font-weight: bold; margin-bottom: 15px; font-size: 1.1em; color: var(--text-main);">🗄️ Veritabanı Yönetimi</div>
+        <div style="font-weight: bold; margin-bottom: 15px; font-size: 1.1em; color: var(--text-main);">Veritabanı Yönetimi</div>
         <div class="btn-group" style="margin-top: 0; margin-bottom: 15px;">
-            <button id="btnSaveNew" class="btn btn-blue">➕ Yeni Havuz Kaydet</button>
-            <button id="btnExportJSON" class="btn btn-purple">📥 Farklı Kaydet</button>
-            <button id="btnImportJSON" class="btn" style="background:#16a085;">📤 Havuz Yükle</button>
+            <button id="btnSaveNew" class="btn btn-blue">Yeni Havuz Kaydet</button>
+            <button id="btnExportJSON" class="btn btn-purple">Farklı Kaydet</button>
+            <button id="btnImportJSON" class="btn" style="background:#16a085;">Havuz Yükle</button>
         </div>
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
             <select id="dbSelect" style="flex: 1; min-width: 200px; padding: 10px; margin: 0;"></select>
             <div class="btn-group" style="flex: 2; min-width: 300px; margin: 0;">
-                <button id="btnLoadDB" class="btn btn-green">📂 Üzerine Ekle</button>
-                <button id="btnUpdateDB" class="btn btn-yellow">🔄 Güncelle</button>
-                <button id="btnDeleteDB" class="btn btn-red">🗑️ Sil</button>
+                <button id="btnLoadDB" class="btn btn-green">Üzerine Ekle</button>
+                <button id="btnUpdateDB" class="btn btn-yellow">Güncelle</button>
+                <button id="btnDeleteDB" class="btn btn-red">Sil</button>
             </div>
         </div>
       </div>
@@ -335,9 +331,9 @@
               Seçilen: 0 / 14
             </div>
         </div>
-        <div class="btn-group" style="margin-top: 5px; width: 100%; margin-bottom: 0;">
-            <button id="btnSelectAll" class="btn btn-green">☑️ Hepsini Seç</button>
-            <button id="btnDeselectAll" class="btn btn-red">☐ Seçimleri Temizle</button>
+        <div style="display: flex; gap: 10px; margin-top: 10px; width: 100%;">
+            <button id="btnToggleSelection" class="btn btn-blue" style="flex: 1;">Tümünü Seç / Temizle</button>
+            <button id="btnDeleteSelected" class="btn btn-red" style="flex: 1;">Seçili Oyuncuları Kaldır</button>
         </div>
       </div>
 
@@ -349,8 +345,8 @@
             Her Zaman Kadro Bul (Boş mevkilere zorunlu adam yerleştir)
         </label>
         <div class="btn-group">
-            <button id="btnRandomSelect" class="btn btn-purple" style="font-size: 1.1em; padding: 12px;">🎲 Rastgele Seç</button>
-            <button id="btnRunSim" class="btn" style="background: #a8e63d; color: #0d1b2a; font-size: 1.1em; padding: 12px;">⚽ Algoritmayı Çalıştır</button>
+            <button id="btnRandomSelect" class="btn btn-purple" style="font-size: 1.1em; padding: 12px;">Rastgele Seç</button>
+            <button id="btnRunSim" class="btn" style="background: #a8e63d; color: #0d1b2a; font-size: 1.1em; padding: 12px;">Algoritmayı Çalıştır</button>
         </div>
       </div>
       

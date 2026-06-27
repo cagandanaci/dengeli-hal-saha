@@ -14,7 +14,7 @@ window.addEventListener('error', (e) => {
 });
 
 // FM Tarzı Dinamik Kalp Çizimi
-window.getConditionHeart = (cond) => {
+window.getConditionHeart = (cond, size = 22) => {
     let color, darkColor, percent;
     if (cond === 'Tam') { color = '#00e676'; darkColor = '#0a381f'; percent = 100; } 
     else if (cond === 'İyi') { color = '#a8e63d'; darkColor = '#2a3b10'; percent = 80; } 
@@ -24,7 +24,7 @@ window.getConditionHeart = (cond) => {
 
     const uid = Math.random().toString(36).substring(2, 9);
 
-    return `<svg viewBox="0 0 24 24" width="22" height="22" style="vertical-align: middle; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.3));" title="${cond} Kondisyon">
+    return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align: middle; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.3));" title="${cond} Kondisyon">
               <defs>
                 <linearGradient id="grad-${uid}" x1="0" y1="1" x2="0" y2="0">
                   <stop offset="0%" stop-color="${color}" />
@@ -81,7 +81,7 @@ function updateCondPreview() {
     const pCondEl = document.getElementById('pCond');
     const previewEl = document.getElementById('condIconPreview');
     if (pCondEl && previewEl) {
-        previewEl.innerHTML = window.getConditionHeart(pCondEl.value);
+        previewEl.innerHTML = window.getConditionHeart(pCondEl.value, 22);
     }
 }
 
@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const styleId = 'hide-ovr-style';
         if (!document.getElementById(styleId)) {
             let s = document.createElement('style'); s.id = styleId;
-            s.innerHTML = '.pitch-ovr-text { display: none !important; }';
+            s.innerHTML = '.pitch-ovr-text, .cond-icon { display: none !important; }';
             document.head.appendChild(s);
         }
     }
@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target.checked) {
             if (!s) {
                 s = document.createElement('style'); s.id = styleId;
-                s.innerHTML = '.pitch-ovr-text { display: none !important; }';
+                s.innerHTML = '.pitch-ovr-text, .cond-icon { display: none !important; }';
                 document.head.appendChild(s);
             }
         } else { if (s) s.remove(); }
@@ -185,8 +185,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    document.getElementById('btnSelectAll')?.addEventListener('click', (e) => { e.preventDefault(); currentPlayers.forEach(p => p.selected = true); updatePlayerList(); });
-    document.getElementById('btnDeselectAll')?.addEventListener('click', (e) => { e.preventDefault(); currentPlayers.forEach(p => p.selected = false); updatePlayerList(); });
+    // Ana buton olayları
+    document.getElementById('btnToggleSelection')?.addEventListener('click', (e) => { 
+        e.preventDefault(); 
+        const allSelected = currentPlayers.length > 0 && currentPlayers.every(p => p.selected);
+        currentPlayers.forEach(p => p.selected = !allSelected); 
+        updatePlayerList(); 
+    });
+    
+    document.getElementById('btnDeleteSelected')?.addEventListener('click', (e) => { 
+        e.preventDefault(); 
+        if(confirm('Seçili oyuncuları havuzdan silmek istediğinize emin misiniz?')) {
+            currentPlayers = currentPlayers.filter(p => !p.selected); 
+            updatePlayerList(); 
+            renderPositionMap();
+        }
+    });
+    
     document.getElementById('btnRandomSelect')?.addEventListener('click', selectRandomPlayers);
     document.getElementById('btnLoadDummies')?.addEventListener('click', loadDummies);
     document.getElementById('btnRemoveDummies')?.addEventListener('click', (e) => { e.preventDefault(); currentPlayers = currentPlayers.filter(p => !p.isTest); updatePlayerList(); renderPositionMap(); });
@@ -201,6 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('pMainPos')?.addEventListener('change', () => { renderPositionMap(); updateLiveRoles(); });
     document.getElementById('matchFormat')?.addEventListener('change', updatePlayerList);
 
+    // Global tıklama olayları
     document.addEventListener('click', (e) => {
         const pitchNode = e.target.closest('.pitch-node-clickable');
         if (pitchNode) {
@@ -252,8 +268,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     updateCondPreview();
-    refreshDatabaseSelect(); 
-    renderPositionMap();
+
+    refreshDatabaseSelect(); renderPositionMap();
 
     const lastDb = localStorage.getItem('last_used_db');
     if (lastDb && getDatabases()[lastDb]) {
@@ -313,7 +329,9 @@ function checkRmSum() {
     warning.style.color = sum === 100 ? '#2ecc71' : '#e74c3c';
 }
 
-/* 🔥 SİLİNEN VERİTABANI VE TEST FONKSİYONLARI BAŞLANGICI 🔥 */
+// ----------------------------------------------------
+// 🔥 VERİTABANI VE TEST FONKSİYONLARI 🔥
+// ----------------------------------------------------
 
 function loadDummies(e) {
     if (e) e.preventDefault();
@@ -348,13 +366,43 @@ function generateFallbackDummies() {
     }));
 }
 
+function exportDatabases(e) { 
+    if(e) e.preventDefault(); 
+    const dbs = getDatabases(); 
+    if(Object.keys(dbs).length === 0) return alert("Kayıtlı veritabanı yok!"); 
+    const a = document.createElement('a'); 
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(dbs)], { type: 'application/json' })); 
+    a.download = 'saha_oyuncu_veritabanlari.json'; 
+    document.body.appendChild(a); 
+    a.click(); 
+    document.body.removeChild(a); 
+}
+
+function importDatabases(e) { 
+    if(e) e.preventDefault(); 
+    const input = document.createElement('input'); 
+    input.type = 'file'; 
+    input.accept = '.json'; 
+    input.onchange = ev => { 
+        const reader = new FileReader(); 
+        reader.onload = readerEvent => { 
+            try { 
+                JSON.parse(readerEvent.target.result); 
+                localStorage.setItem('football_databases', readerEvent.target.result); 
+                refreshDatabaseSelect(); 
+                alert("Yüklendi."); 
+            } catch { alert("Hata!"); } 
+        }; 
+        reader.readAsText(ev.target.files[0]); 
+    }; 
+    input.click(); 
+}
+
 function getDatabases() { 
     try { 
         const data = localStorage.getItem('football_databases'); 
         return data ? JSON.parse(data) : {}; 
-    } catch(e) { 
-        return {}; 
-    } 
+    } catch(e) { return {}; } 
 }
 
 function setDatabases(dbs) { 
@@ -371,8 +419,8 @@ function refreshDatabaseSelect() {
 
 function saveNewDatabase(e) { 
     if (e) e.preventDefault(); 
-    if (!currentPlayers.length) return alert("Havuza önce oyuncu eklemelisiniz!"); 
-    const dbName = prompt("Yeni Veritabanı Adı:"); 
+    if (!currentPlayers.length) return alert("Oyuncu yok!"); 
+    const dbName = prompt("İsim:"); 
     if (!dbName) return; 
     const dbs = getDatabases(); 
     dbs[dbName] = currentPlayers; 
@@ -395,7 +443,7 @@ function loadDatabase(e) {
         chartInstances = {}; 
         updatePlayerList(); 
         renderPositionMap(); 
-        alert(`"${dbName}" listeye eklendi.`); 
+        alert(`"${dbName}" eklendi.`); 
         localStorage.setItem('last_used_db', dbName); 
     } 
 }
@@ -403,11 +451,11 @@ function loadDatabase(e) {
 function updateDatabase(e) { 
     if (e) e.preventDefault(); 
     const dbName = document.getElementById('dbSelect')?.value; 
-    if (!dbName) return alert("Önce bir veritabanı seçin!"); 
+    if (!dbName) return; 
     const dbs = getDatabases(); 
     dbs[dbName] = currentPlayers; 
     setDatabases(dbs); 
-    alert(`"${dbName}" güncellendi.`); 
+    alert(`Güncellendi.`); 
     localStorage.setItem('last_used_db', dbName); 
 }
 
@@ -415,7 +463,7 @@ function deleteDatabase(e) {
     if (e) e.preventDefault(); 
     const dbName = document.getElementById('dbSelect')?.value; 
     if (!dbName) return; 
-    if (confirm(`"${dbName}" silinecek. Emin misiniz?`)) { 
+    if (confirm(`Silinsin mi?`)) { 
         const dbs = getDatabases(); 
         delete dbs[dbName]; 
         setDatabases(dbs); 
@@ -423,43 +471,11 @@ function deleteDatabase(e) {
     } 
 }
 
-function exportDatabases(e) { 
-    if(e) e.preventDefault(); 
-    const dbs = getDatabases(); 
-    if(Object.keys(dbs).length === 0) return alert("Dışa aktarılacak kayıtlı veritabanı yok!"); 
-    const a = document.createElement('a'); 
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(dbs)], { type: 'application/json' })); 
-    a.download = 'saha_oyuncu_veritabanlari.json'; 
-    document.body.appendChild(a); 
-    a.click(); 
-    document.body.removeChild(a); 
-}
-
-function importDatabases(e) { 
-    if(e) e.preventDefault(); 
-    const input = document.createElement('input'); 
-    input.type = 'file'; 
-    input.accept = '.json'; 
-    input.onchange = ev => { 
-        const reader = new FileReader(); 
-        reader.onload = readerEvent => { 
-            try { 
-                JSON.parse(readerEvent.target.result); 
-                localStorage.setItem('football_databases', readerEvent.target.result); 
-                refreshDatabaseSelect(); 
-                alert("Veritabanları başarıyla yüklendi."); 
-            } catch { alert("Dosya okunamadı! Hatalı format."); } 
-        }; 
-        reader.readAsText(ev.target.files[0]); 
-    }; 
-    input.click(); 
-}
-
 function selectRandomPlayers(e) { 
     if (e) e.preventDefault(); 
     const format = Number(document.getElementById('matchFormat')?.value || 7); 
     const req = format * 2; 
-    if (currentPlayers.length < req) return alert(`Rastgele seçim için en az ${req} kişi olmalı.`); 
+    if (currentPlayers.length < req) return alert(`En az ${req} gerekli.`); 
     
     currentPlayers.forEach(p => p.selected = false); 
     const gks = currentPlayers.filter(p => p.mainPos === 'GK').sort(() => Math.random() - 0.5); 
@@ -481,7 +497,9 @@ function selectRandomPlayers(e) {
     updatePlayerList(); 
 }
 
-/* 🔥 SİLİNEN VERİTABANI VE TEST FONKSİYONLARI BİTİŞİ 🔥 */
+// ----------------------------------------------------
+// UI VE HESAPLAMA FONKSİYONLARI
+// ----------------------------------------------------
 
 function getOvrForPosition(player, pos, role, capacity) {
     const basePos = getBasePosition(pos);
@@ -540,7 +558,7 @@ function openPlayerModal(info) {
             <b>Mevki:</b> ${info.basePos} | 
             <b>Rol:</b> <span style="color:#2ecc71;">${info.role}</span> <br>
             <b>Mevki Kapasitesi:</b> <span style="color:${info.cap===100?'#2ecc71':(info.cap>50?'#f39c12':'#e74c3c')};">%${info.cap}</span> | 
-            <b>Kondisyon:</b> <span style="margin-right:5px;">${window.getConditionHeart(info.cond)}</span> ${info.cond} (Çarpan: x${condMulti})
+            <b>Kondisyon:</b> <span class="cond-icon" style="margin-right:5px;">${window.getConditionHeart(info.cond)}</span> ${info.cond} (Çarpan: x${condMulti})
         </div>
         <div style="font-weight:bold; color:#f39c12; margin-bottom:10px;">Takım Dengesine Bireysel Katkı Analizi:</div>
         <table class="sim-stat-table" style="width:100%; text-align:left; border-collapse:collapse; font-size:0.95em;">
@@ -612,12 +630,12 @@ function generateMiniPitchHTML(player, width = "140px") {
         } else if (isMain) {
             const ovr = getOvrForPosition(player, pos, mainRole, 100);
             bgColor = '#00d2d3'; border = '2px solid white'; content = pos; size = 24; zIndex = 8; opacity = 1;
-            tooltipText = `<b>${pos} (Ana)</b><br><span style="color:#f39c12;">${mainRole || 'Rol Seçilmedi'}</span><br><span style="color:#a8e63d;">${ovr} OVR</span>`;
+            tooltipText = `<b>${pos} (Ana)</b><br><span style="color:#f39c12;">${mainRole || 'Rol Seçilmedi'}</span><br><span style="color:${window.getStatColor(ovr)};">${ovr} OVR</span>`;
         } else if (isSec) {
             const ovr = getOvrForPosition(player, pos, secObj.role, secObj.capacity);
             bgColor = secObj.capacity === 100 ? '#00d2d3' : `hsl(${Math.floor((secObj.capacity / 100) * 120)}, 80%, 45%)`;
             border = '1px solid white'; content = pos; size = 20; zIndex = 7; opacity = 1;
-            tooltipText = `<b>${pos} (Yan) - %${secObj.capacity}</b><br><span style="color:#f39c12;">${secObj.role || 'Rol Seçilmedi'}</span><br><span style="color:#a8e63d;">${ovr} OVR</span>`;
+            tooltipText = `<b>${pos} (Yan) - %${secObj.capacity}</b><br><span style="color:#f39c12;">${secObj.role || 'Rol Seçilmedi'}</span><br><span style="color:${window.getStatColor(ovr)};">${ovr} OVR</span>`;
         } else {
             bgColor = 'rgba(255,255,255,0.1)'; border = '1px dashed rgba(255,255,255,0.4)'; content = ''; size = 16; zIndex = 5; opacity = 0.6;
             tooltipText = `<b>${pos}</b><br><span style="color:var(--text-muted);">(Kapat)</span>`;
@@ -640,6 +658,10 @@ function generateMiniPitchHTML(player, width = "140px") {
         </div>`;
 }
 
+// ----------------------------------------------------
+// 🔥 SİMÜLASYON, PITCH VE LİSTE GÜNCELLEMELERİ 🔥
+// ----------------------------------------------------
+
 function generateTacticalPitchHTML(lineup, title, teamColor = '#00d2d3', teamType = 'A') {
     if (!lineup) return '';
     
@@ -659,6 +681,9 @@ function generateTacticalPitchHTML(lineup, title, teamColor = '#00d2d3', teamTyp
         if (!item.player) return;
         
         const weights = ROLE_WEIGHTS[item.basePos]?.[item.role] || {};
+        const condMulti = CONDITIONS[item.player.condition] || 1.0;
+        const activeOvr = Math.round(item.pOvr * condMulti);
+        
         const pinfo = { cond: item.player.condition, basePos: item.basePos, role: item.role, cap: item.cap, weights: weights, stats: item.player.stats, name: item.player.name, pOvr: item.pOvr };
         const encodedInfo = encodeURIComponent(JSON.stringify(pinfo));
 
@@ -670,35 +695,32 @@ function generateTacticalPitchHTML(lineup, title, teamColor = '#00d2d3', teamTyp
         if (item.outOfPos) { 
             warningIcon = `<div class="pitch-player-alert" style="position:absolute; top:-8px; right:-8px; font-size:16px; text-shadow: 1px 1px 2px #000; z-index: 10;">⚠️</div>`; 
             circleColor = '#e74c3c'; 
-        } 
-
-        if (useTeamColors) {
-            if (teamType === 'A') {
-                circleColor = item.pOvr >= 85 ? '#00d2d3' : '#2980b9'; 
-            } else {
-                circleColor = '#e74c3c'; 
-            }
+        } else if (useTeamColors) {
+            // A Takımı yuvarlakları her zaman Koyu Mavi, B takımı Kırmızı. (85+ kuralı sadece yazıda)
+            circleColor = teamType === 'A' ? '#3498db' : '#e74c3c'; 
         } else {
-            if (item.outOfPos) { circleColor = '#e74c3c'; } 
-            else if (item.isMain || (item.isSec && item.cap === 100)) { circleColor = '#00d2d3'; } 
+            if (item.isMain || (item.isSec && item.cap === 100)) { circleColor = '#00d2d3'; } 
             else if (item.isSec) { circleColor = `hsl(${Math.floor(((item.cap || 50) / 100) * 120)}, 80%, 45%)`; }
         }
 
         const nameColor = item.player.isTest ? '#2ecc71' : 'white';
+        
+        // Aktif OVR hesabı ve Kalp dahil edildi (FM Tarzı)
         playersHTML += `
             <div class="pitch-player" data-pinfo="${encodedInfo}" style="position: absolute; left: ${posData.x}%; top: ${posData.y}%; z-index: 5;">
                 <div class="pitch-player-icon" style="background-color: ${circleColor};">${warningIcon}</div>
                 <div class="pitch-player-label">
-                    <div style="display: flex; justify-content: center; align-items: baseline; gap: 6px; margin-bottom: 2px;">
+                    <div style="display: flex; justify-content: center; align-items: baseline; gap: 4px; margin-bottom: 2px;">
                         <span style="color:#ecf0f1; font-weight:bold; font-size: 0.85em;">${item.slot}</span>
-                        <span class="pitch-ovr-text" style="color:${window.getStatColor(item.pOvr)}; font-weight:bold; font-size: 1.1em; line-height: 1;">${item.pOvr}</span>
+                        <span class="pitch-ovr-text" style="color:${window.getStatColor(activeOvr)}; font-weight:bold; font-size: 1.1em; line-height: 1;">${activeOvr}</span>
+                        <span class="cond-icon" style="display: flex; align-items: center;">${window.getConditionHeart(item.player.condition, 14)}</span>
                     </div>
                     <div style="white-space: normal; line-height: 1.1; font-size: 0.95em; color:${nameColor}; font-weight: 800;">${getPitchName(item.player, currentPlayers)}</div>
                 </div>
             </div>`;
     });
 
-    const headerColor = teamType === 'A' ? '#2980b9' : '#e74c3c';
+    const headerColor = teamType === 'A' ? '#3498db' : '#e74c3c';
 
     return `
         <div class="pitch-container">
@@ -738,7 +760,6 @@ function updatePlayerList() {
             html += pList.map(p => {
                 const nameColor = p.isTest ? '#2ecc71' : 'inherit'; 
                 const displayNameHtml = p.shortName?.trim() ? ` <span style="color:var(--text-muted); font-size:0.85em;">(${p.shortName.trim()})</span>` : '';
-                const condHeart = window.getConditionHeart(p.condition);
                 
                 const eff = getEffectivePlayerInfo(p);
                 const posDisplay = eff.isBanned ? `<s style="color:#e74c3c;">${eff.original}</s> <span style="color:#e67e22; font-size:0.9em; font-weight:bold;">(En iyi mevki: ${eff.active})</span>` : `${eff.original}`;
@@ -763,13 +784,22 @@ function updatePlayerList() {
                     ? p.secondaryPositions.map(sp => `<span class="badge" style="background:${window.getStatColor(sp.capacity === 100 ? 85 : (sp.capacity>50?65:30))};">${sp.pos} (%${sp.capacity})</span>`).join('') 
                     : '<span style="font-size:0.85em; color:var(--text-muted);">Yok</span>';
 
+                const condMulti = CONDITIONS[p.condition] || 1.0;
+                const activeOvr = Math.round(eff.ovr * condMulti);
+                const condHeart = `<span class="cond-icon">${window.getConditionHeart(p.condition, 18)}</span>`;
+                
+                let ovrBadgeText = `${eff.ovr} OVR`;
+                if (condMulti < 1.0) {
+                    ovrBadgeText = `${eff.ovr} OVR (Aktif: ${activeOvr})`;
+                }
+
                 return `
                 <details class="player-item" id="details-${p.id}">
                   <summary class="player-summary">
                     <div style="display: flex; align-items: center; gap: 10px;">
                       <input type="checkbox" class="player-select-cb" data-id="${p.id}" ${p.selected ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer;">
                       <span style="${p.selected ? '' : 'text-decoration:line-through; opacity:0.5;'}">
-                        <b style="color:${nameColor};">${p.name}</b>${displayNameHtml} ${condHeart} <span style="background:#f39c12; color:white; padding:2px 6px; border-radius:4px; font-size:0.8em; margin-left:4px;">${eff.ovr} OVR</span> | ${posDisplay} ${roleDisplay}
+                        <b style="color:${nameColor};">${p.name}</b>${displayNameHtml} ${condHeart} <span class="pitch-ovr-text" style="background:${window.getStatColor(activeOvr)}; color:white; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding:2px 6px; border-radius:4px; font-size:0.8em; margin-left:4px;">${ovrBadgeText}</span> | ${posDisplay} ${roleDisplay}
                       </span>
                     </div>
                   </summary>
@@ -777,7 +807,7 @@ function updatePlayerList() {
                   <div class="player-details-row">
                     <div class="pd-col-stats">
                         ${statsHtml}
-                        <div style="position:relative; width:100%; max-width: 180px; aspect-ratio: 1/1; margin: 10px auto 0 auto; display: flex; justify-content: center;">
+                        <div style="position:relative; width:100%; max-width: 220px; aspect-ratio: 1/1; margin: 10px auto 0 auto; display: flex; justify-content: center;">
                             <canvas id="chart-${p.id}"></canvas>
                         </div>
                     </div>
@@ -1066,7 +1096,7 @@ function runSimulation(e) {
         let diffText = '0.0';
         
         if (diff > 0.05) {
-            diffColor = '#2980b9'; 
+            diffColor = '#3498db'; 
             diffText = `+${diff.toFixed(1)}`;
         } else if (diff < -0.05) {
             diffColor = '#e74c3c'; 
@@ -1112,10 +1142,10 @@ function runSimulation(e) {
 
             html += `
             <div class="sim-result-card">
-                <div style="color: #f39c12; font-weight: bold; font-size: 1.1em; margin-bottom: 15px;">✨ SEÇENEK #${index + 1} <span style="font-size: 0.8em; color: var(--text-muted);"> (Denge Skoru: ${(data.rawPenalty || 0).toFixed(0)} ${data.quality ? `| Kadro Kalitesi: ${data.quality.toFixed(0)}` : ''})</span></div>
+                <div style="color: #f39c12; font-weight: bold; font-size: 1.1em; margin-bottom: 15px;">✨ SEÇENEK #${index + 1} <span style="font-size: 0.8em; color: var(--text-muted);"> (Denge Skoru: ${(data.rawPenalty || data.penalty || 0).toFixed(0)})</span></div>
                 
                 <div class="pitch-wrapper">
-                    ${generateTacticalPitchHTML(data.lineupA, `A Takımı`, '#00d2d3', 'A')}
+                    ${generateTacticalPitchHTML(data.lineupA, `A Takımı`, '#3498db', 'A')}
                     ${generateTacticalPitchHTML(data.lineupB, `B Takımı`, '#e74c3c', 'B')}
                 </div>
                 
@@ -1125,7 +1155,7 @@ function runSimulation(e) {
                             <thead>
                                 <tr style="border-bottom: 2px solid var(--border-color);">
                                     <th style="color:#f39c12; text-align: left; padding: 8px;">Özellik</th>
-                                    <th style="color:#2980b9; padding: 8px;">A Takımı</th>
+                                    <th style="color:#3498db; padding: 8px;">A Takımı</th>
                                     <th style="color:#e74c3c; padding: 8px;">B Takımı</th>
                                     <th style="color:#f39c12; padding: 8px;">Fark (A-B)</th>
                                 </tr>
@@ -1146,16 +1176,15 @@ function runSimulation(e) {
                 </div>
 
                 <details class="sim-log-details">
-                    <summary style="font-weight: bold; color: #2980b9; outline: none; list-style: none;">
+                    <summary style="font-weight: bold; color: #3498db; outline: none; list-style: none;">
                         <span style="display: flex; align-items: center; gap: 5px;">
                             <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>
                             Algoritma Karar Dökümünü Göster
                         </span>
                     </summary>
                     <div class="sim-log-content">
-                        ${data.quality ? `<div style="margin-bottom: 5px; color:#2ecc71;"><b>[★] Toplam Kadro Kalitesi (OVR):</b> ${data.quality.toFixed(0)}</div>` : ''}
                         <div style="margin-bottom: 5px;"><b>[!] Taktiksel Boşluk (Grid) Cezası:</b> A Takımı (<span style="color:#e74c3c;">${(data.lineupA.gridPenalty || 0).toFixed(0)}</span>) | B Takımı (<span style="color:#e74c3c;">${(data.lineupB.gridPenalty || 0).toFixed(0)}</span>)</div>
-                        <div style="margin-bottom: 10px;"><b>[!] Stat Dengesizliği Cezası:</b> <span style="color:#e74c3c;">${((data.rawPenalty || 0) - (data.lineupA.gridPenalty || 0) - (data.lineupB.gridPenalty || 0)).toFixed(0)}</span> Puan</div>
+                        <div style="margin-bottom: 10px;"><b>[!] Stat Dengesizliği Cezası:</b> <span style="color:#e74c3c;">${((data.rawPenalty || data.penalty || 0) - (data.lineupA.gridPenalty || 0) - (data.lineupB.gridPenalty || 0)).toFixed(0)}</span> Puan</div>
                         <div><b>[ℹ] Mevki Optimizasyonları (Fedakarlıklar):</b></div>
                         <ul style="margin: 5px 0 0 0; padding-left: 20px; list-style-type: square;">
                             ${generateOptimizationLog(data.lineupA, 'A Takımı')}
@@ -1171,7 +1200,7 @@ function runSimulation(e) {
               for (let i = 5; i < validSquads.length; i++) {
                   const data = validSquads[i];
                   
-                  const formatPlayer = p => `<span style="white-space:nowrap;">${p.player.shortName || p.player.firstName} <b style="color:#f39c12">(${p.slot})</b></span>`;
+                  const formatPlayer = p => `<span style="white-space:nowrap;">${p.player.shortName || p.player.firstName} <b style="color:${window.getStatColor(p.pOvr)}">(${p.slot})</b></span>`;
                   const aNames = data.lineupA.lineup.map(formatPlayer).join(', ');
                   const bNames = data.lineupB.lineup.map(formatPlayer).join(', ');
                   
@@ -1180,9 +1209,9 @@ function runSimulation(e) {
                       <div class="sim-alt-card">
                           <div style="min-width: 40px; font-weight: bold; color: #f1c40f; font-size: 1.1em;">#${i + 1}</div>
                           <div style="flex: 1; line-height: 1.6;">
-                              <div style="margin-bottom: 6px;"><b style="color: #2980b9;">A Takımı (${data.lineupA.formationName}):</b> <span style="font-size:0.95em;">${aNames}</span></div>
+                              <div style="margin-bottom: 6px;"><b style="color: #3498db;">A Takımı (${data.lineupA.formationName}):</b> <span style="font-size:0.95em;">${aNames}</span></div>
                               <div><b style="color: #e74c3c;">B Takımı (${data.lineupB.formationName}):</b> <span style="font-size:0.95em;">${bNames}</span></div>
-                              <div style="font-size:0.85em; color:var(--text-muted); margin-top: 4px;">Denge Skoru: ${(data.rawPenalty || 0).toFixed(0)} ${data.quality ? `| Kadro Kalitesi: ${data.quality.toFixed(0)}` : ''}</div>
+                              <div style="font-size:0.85em; color:var(--text-muted); margin-top: 4px;">Denge Skoru: ${(data.rawPenalty || data.penalty || 0).toFixed(0)}</div>
                           </div>
                       </div>
                   </div>`;
@@ -1202,12 +1231,12 @@ function runSimulation(e) {
                   data: { 
                       labels: ['Hava', 'Pas D.', 'Sav', 'Şut', 'Dribling', 'Fırsat Y.'], 
                       datasets: [
-                          { label: 'A Takımı', data: [trueStatsA.hava, trueStatsA.pas, trueStatsA.savunma, trueStatsA.sut, trueStatsA.dribling, trueStatsA.firsat], backgroundColor: 'rgba(41, 128, 185, 0.25)', borderColor: '#2980b9', borderWidth: 2, pointBackgroundColor: '#2980b9', pointRadius: 2 }, 
+                          { label: 'A Takımı', data: [trueStatsA.hava, trueStatsA.pas, trueStatsA.savunma, trueStatsA.sut, trueStatsA.dribling, trueStatsA.firsat], backgroundColor: 'rgba(52, 152, 219, 0.25)', borderColor: '#3498db', borderWidth: 2, pointBackgroundColor: '#3498db', pointRadius: 2 }, 
                           { label: 'B Takımı', data: [trueStatsB.hava, trueStatsB.pas, trueStatsB.savunma, trueStatsB.sut, trueStatsB.dribling, trueStatsB.firsat], backgroundColor: 'rgba(231, 76, 60, 0.25)', borderColor: '#e74c3c', borderWidth: 2, pointBackgroundColor: '#e74c3c', pointRadius: 2 }
                       ] 
                   }, 
                   options: { 
-                      layout: { padding: 10 }, 
+                      layout: { padding: 25 }, 
                       maintainAspectRatio: false, 
                       scales: { 
                           r: { 
@@ -1240,7 +1269,7 @@ function renderRadarChart(playerId) {
         type: 'radar', 
         data: { labels: labels, datasets: [{ label: 'Profil', data: data, backgroundColor: 'rgba(0, 210, 211, 0.25)', borderColor: '#00d2d3', pointBackgroundColor: '#1dd1a1', borderWidth: 2 }] }, 
         options: { 
-            layout: { padding: 5 }, 
+            layout: { padding: 25 }, 
             maintainAspectRatio: false, 
             scales: { 
                 r: { 
