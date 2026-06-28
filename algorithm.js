@@ -22,104 +22,102 @@ export function getBestRoleForStats(pos, stats) {
 }
 
 export function calculateTeamStatsLineup(lineupArr) {
-  let stats = { pas: 0, savunma: 0, sut: 0, dribling: 0, firsat: 0, hava: 0, totalOvr: 0 };
-  let maxStats = { pas: 0, savunma: 0, sut: 0, dribling: 0, firsat: 0, hava: 0 }; // 🔥 Sabit tavanlar yerine Dinamik Potansiyel
+  let actual = { pas: 0, savunma: 0, sut: 0, dribling: 0, firsat: 0, hava: 0 };
+  let maximum = { pas: 0, savunma: 0, sut: 0, dribling: 0, firsat: 0, hava: 0 };
 
   lineupArr.forEach(item => {
     if (item.invalid || !item.player) return; 
     
     const p = item.player;
-    const role = item.role || getBestRoleForStats(item.basePos, p.stats);
+    const role = (item.role && item.role !== 'null') ? item.role : getBestRoleForStats(item.basePos, p.stats);
+    item.role = role; 
     
     const kapasiteCarpani = item.cap / 100;
     const kondisyonCarpani = CONDITIONS[p.condition] || 1.0;
-    
-    // Takımın toplam OVR havuzuna katkısı
-    stats.totalOvr += item.pOvr * kondisyonCarpani;
-
     const weights = ROLE_WEIGHTS[item.basePos]?.[role] || {};
 
     ['pas', 'savunma', 'sut', 'dribling', 'firsat', 'hava'].forEach(statName => {
         let hamStat = p.stats[statName] || 0;
-        let rolAgirligi = weights[statName] || 0;
+        if(statName === 'sut' && !hamStat) hamStat = p.stats['şut'] || 0;
+        if(statName === 'firsat' && !hamStat) hamStat = p.stats['fırsat'] || 0;
 
-        // Kalecilerde Kondisyon Sadece Savunma, Dribling ve Hava Topunu Etkiler
+        let rolAgirligi = (weights[statName] || 0) / 100;
+
         let sonKondisyon = kondisyonCarpani;
         if (item.basePos === 'GK' && !['savunma', 'dribling', 'hava'].includes(statName)) {
             sonKondisyon = 1.0;
         }
 
-        // Oyuncunun mevcut yeteneğiyle takıma kattığı
-        let oyuncuKatkisi = hamStat * (rolAgirligi / 100) * kapasiteCarpani * sonKondisyon;
-        
-        // Eğer oyuncunun o özelliği 100 olsaydı takıma katacağı (Tavanı belirliyoruz)
-        let maxKatki = 100 * (rolAgirligi / 100) * kapasiteCarpani * sonKondisyon;
+        let actKatki = hamStat * rolAgirligi * kapasiteCarpani * sonKondisyon;
+        let maxKatki = 100 * rolAgirligi * 1.0 * 1.0; 
 
-        // 🔥 KALECİ ÖZEL: Şut kurtarmanın takıma %50 savunma katkısı vermesi
         if (statName === 'savunma' && item.basePos === 'GK') {
-            const sutKarAgirlik = weights['sutKarsilama'] || 0;
-            const sutKarStat = p.stats['sutKarsilama'] || 0;
-            
-            const sutKarKatkisi = sutKarStat * (sutKarAgirlik / 100) * kapasiteCarpani * 1.0 * 0.5; // %50 Etki
-            const sutKarMax = 100 * (sutKarAgirlik / 100) * kapasiteCarpani * 1.0 * 0.5;
-
-            oyuncuKatkisi += sutKarKatkisi;
-            maxKatki += sutKarMax;
+            let wKar = (weights['sutKarsilama'] || 0) / 100;
+            let sKar = p.stats['sutKarsilama'] || 0;
+            actKatki += sKar * wKar * kapasiteCarpani * 1.0 * 0.5; 
+            maxKatki += 100 * wKar * 1.0 * 1.0 * 0.5; 
         }
 
-        stats[statName] += oyuncuKatkisi;
-        maxStats[statName] += maxKatki;
+        actual[statName] += actKatki;
+        maximum[statName] += maxKatki;
     });
   });
 
-  // Takımın ulaştığı gücü, o dizilişte ulaşabileceği MİLYARLIK tavana bölüp % olarak 100 üzerinden hesaplıyoruz.
-  ['pas', 'savunma', 'sut', 'dribling', 'firsat', 'hava'].forEach(c => {
-    if (maxStats[c] > 0) {
-        stats[c] = (stats[c] / maxStats[c]) * 100;
-    } else {
-        stats[c] = 0;
-    }
+  let normalized = {};
+  ['pas', 'savunma', 'sut', 'dribling', 'firsat', 'hava'].forEach(s => {
+      normalized[s] = maximum[s] > 0 ? (actual[s] / maximum[s]) * 100 : 0;
   });
 
-  return stats;
+  return { actual, maximum, normalized };
 }
 
-export function calculateBalanceMetrics(statsA, statsB, invalidCountA, invalidCountB) {
-  // Artık değerler 0.8 veya 1.2 değil, 85.5 veya 92.3 gibi 100'lük sistemde.
-  const dSav = statsA.savunma - statsB.savunma;
-  const dPas = statsA.pas - statsB.pas;
-  const dSut = statsA.sut - statsB.sut;
-  const dDrib = statsA.dribling - statsB.dribling;
-  const dFir = statsA.firsat - statsB.firsat;
-  const dHav = statsA.hava - statsB.hava;
-  const dOvr = statsA.totalOvr - statsB.totalOvr; 
-  
-  const diffs = { pas: dPas, savunma: dSav, sut: dSut, dribling: dDrib, firsat: dFir, hava: dHav, ovr: dOvr };
-
+export function calculateBalanceMetrics(normA, normB, invalidCountA, invalidCountB, ovrA, ovrB, lineupA, lineupB, havaLowPriority) {
   let penaltyScore = 0;
   
-  // 100'lük sisteme geçtiğimiz için çarpan ağırlıklarını optimize ettik
-  const pw = 5.0; 
-  
-  penaltyScore += (dSav * dSav) * pw;  
-  penaltyScore += (dPas * dPas) * pw;   
-  penaltyScore += (dSut * dSut) * pw;
-  penaltyScore += (dDrib * dDrib) * pw;
-  penaltyScore += (dFir * dFir) * pw;
-  penaltyScore += (dHav * dHav) * (window.HAVA_LOW_PRIORITY ? (pw / 5) : pw); 
+  // 1. SAF DENGE: Toplam OVR Farkı (Ana Etken)
+  const netDiff = Math.abs(ovrA - ovrB);
+  penaltyScore += netDiff * 1000.0;
 
-  // Radarda herhangi bir stat %10'dan fazla fark atıyorsa cezayı katla
-  const maxDiff = Math.max( Math.abs(dSav), Math.abs(dPas), Math.abs(dSut), Math.abs(dDrib), Math.abs(dFir), Math.abs(dHav) );
-  if (maxDiff > 10) {
-      penaltyScore += (maxDiff * maxDiff) * 10.0; 
+  // 2. UÇURUM CEZASI: max(0, |Fark| - 5)^3
+  const calcCliff = (valA, valB) => {
+       let diff = Math.abs(valA - valB);
+       return Math.pow(Math.max(0, diff - 5), 3);
+  };
+
+  const pw = 1.0; 
+  penaltyScore += calcCliff(normA.savunma, normB.savunma) * pw;  
+  penaltyScore += calcCliff(normA.pas, normB.pas) * pw;   
+  penaltyScore += calcCliff(normA.sut, normB.sut) * pw;
+  penaltyScore += calcCliff(normA.dribling, normB.dribling) * pw;
+  penaltyScore += calcCliff(normA.firsat, normB.firsat) * pw;
+  
+  if (!havaLowPriority) {
+      penaltyScore += calcCliff(normA.hava, normB.hava) * pw;
   }
 
-  // 🔥 Toplam OVR Farkı Cezası (Takım güçlerinin denkliği için devasa öneme sahip)
-  penaltyScore += (dOvr * dOvr) * 50.0;
-
+  // 3. TERS MEVKİ (Invalid) CEZASI
   penaltyScore += (invalidCountA + invalidCountB) * 1000000;
 
-  return { diffs, penaltyScore };
+  // 🔥 4. BİREYSEL POTANSİYEL İSRAFI (Wasted Potential) TIE-BREAKER'I 🔥
+  const calcWastedPotential = (lineupObj) => {
+      let waste = 0;
+      lineupObj.lineup.forEach(item => {
+          if (!item.player || item.invalid || item.cap === 100) return;
+          const p = item.player;
+          const rawSum = (p.stats.pas || 0) + (p.stats.savunma || 0) + (p.stats.sut || p.stats.şut || 0) + (p.stats.dribling || 0) + (p.stats.firsat || p.stats.fırsat || 0);
+          const drop = (100 - item.cap) / 100; 
+          waste += (rawSum * drop);
+      });
+      return waste;
+  };
+  penaltyScore += (calcWastedPotential(lineupA) + calcWastedPotential(lineupB)) * 2.0;
+
+  return { penaltyScore };
+}
+
+function getBasePosition(slot) {
+  const map = { "LCB": "CB", "RCB": "CB", "LCM": "CM", "RCM": "CM", "LDM": "DM", "RDM": "DM", "LAM": "AM", "RAM": "AM", "LFW": "FW", "RFW": "FW" };
+  return map[slot] || slot;
 }
 
 function getCombinations(arr, k) {
@@ -140,14 +138,73 @@ function getCombinations(arr, k) {
     return results;
 }
 
+function isAttackerRole(basePos, role) {
+    if (['FW', 'AM', 'LW', 'RW'].includes(basePos)) return true;
+    if (['LM', 'RM'].includes(basePos) && ['Ofansif Açık Orta Saha', 'Ters Ofansif Açık Orta Saha'].includes(role)) return true;
+    if (basePos === 'CM' && ['Hücumcu Orta Saha', 'Şutör Orta Saha'].includes(role)) return true;
+    if (basePos === 'DM' && role === 'Hücumcu Defansif Orta Saha') return true;
+    if (['LWB', 'RWB'].includes(basePos) && role === 'Ofansif Kanat Bek') return true;
+    return false;
+}
+
+const processRolesAndCountAtk = (lineupObj) => {
+    let atkCount = 0;
+    lineupObj.lineup.forEach(item => {
+        if (item.invalid || !item.player) return;
+        let role = item.role;
+        if (!role || role === 'null' || item.outOfPos) {
+            role = getBestRoleForStats(item.basePos, item.player.stats);
+            item.role = role; 
+        }
+        if (isAttackerRole(item.basePos, role)) atkCount++;
+    });
+    return atkCount;
+};
+
 export function getAllSquads(players, format, forceFill, havaLowPriority = true) {
-  window.HAVA_LOW_PRIORITY = havaLowPriority; 
+  const havaMulti = havaLowPriority ? 0.0001 : 1.0;
   
   const N = players.length;
   if (N !== format * 2) return []; 
 
   players.forEach((p, i) => p._internal_id = i);
   initFormationMatcher(players, forceFill);
+
+  let totalPoolRawPotential = 0;
+  let capableAttackersInPool = 0;
+
+  players.forEach(p => {
+     let canAttack = false;
+     const mainBase = getBasePosition(p.mainPos);
+     const checkPos = (base, r) => {
+         const effRole = (!r || r === 'null') ? getBestRoleForStats(base, p.stats) : r;
+         return isAttackerRole(base, effRole);
+     };
+
+     if (checkPos(mainBase, p.role)) canAttack = true;
+     if (p.secondaryPositions) {
+         p.secondaryPositions.forEach(sp => {
+             if (checkPos(getBasePosition(sp.pos), sp.role)) canAttack = true;
+         });
+     }
+     if (canAttack) capableAttackersInPool++;
+
+     ['pas', 'savunma', 'sut', 'dribling', 'firsat', 'hava'].forEach(statName => {
+         let hamStat = p.stats[statName] || 0;
+         if(statName === 'sut' && !hamStat) hamStat = p.stats['şut'] || 0;
+         if(statName === 'firsat' && !hamStat) hamStat = p.stats['fırsat'] || 0;
+         totalPoolRawPotential += hamStat;
+     });
+  });
+
+  const poolAvgStat = totalPoolRawPotential / (N * 6);
+  const targetScore = poolAvgStat * 0.70; 
+
+  let targetAtkLimit = 0;
+  if (format > 5 && format < 10) targetAtkLimit = 3;
+  else if (format >= 10) targetAtkLimit = 4;
+
+  const appliedAtkLimit = Math.min(targetAtkLimit, Math.floor(capableAttackersInPool / 2));
 
   const cache = new Array(1 << N).fill(null);
 
@@ -196,47 +253,62 @@ export function getAllSquads(players, format, forceFill, havaLowPriority = true)
 
       if (!lineupsA || !lineupsB || !lineupsA.length || !lineupsB.length) continue;
 
-      const bestA = lineupsA[0];
-      const bestB = lineupsB[0];
-      
-      if (!forceFill && (bestA.invalidCount > 0 || bestB.invalidCount > 0)) continue;
+      let validPair = null;
 
-      const statsA = calculateTeamStatsLineup(bestA.lineup);
-      const statsB = calculateTeamStatsLineup(bestB.lineup);
-      bestA.stats = statsA;
-      bestB.stats = statsB;
-
-      // 1. Taktiksel Stat Farkı (Yüzdelik) + Toplam OVR Farkı Cezası
-      const metrics = calculateBalanceMetrics(statsA, statsB, bestA.invalidCount, bestB.invalidCount);
-
-      if (metrics.penaltyScore > 500000 && !forceFill) continue;
-
-      // 🔥 2. BİREBİR OYUNCU EŞLEŞTİRME (DAĞILIM) CEZASI 🔥
-      // Takımlardaki oyuncuları en iyiden en kötüye sıralayıp karşılıklı denk olup olmadıklarına bakıyoruz.
-      const getActiveOvr = (item) => {
-          if (!item || !item.player) return 0;
-          const condMulti = CONDITIONS[item.player.condition] || 1.0;
-          return Math.round(item.pOvr * condMulti);
-      };
-
-      const ovrsA = bestA.lineup.map(getActiveOvr).sort((a, b) => b - a);
-      const ovrsB = bestB.lineup.map(getActiveOvr).sort((a, b) => b - a);
-
-      let distributionPenalty = 0;
-      for(let i = 0; i < ovrsA.length; i++) {
-          const diff = Math.abs(ovrsA[i] - ovrsB[i]);
-          distributionPenalty += (diff * diff) * 10; 
+      for (let la of lineupsA) {
+          if (!forceFill && la.invalidCount > 0) continue;
+          if (!forceFill && processRolesAndCountAtk(la) < appliedAtkLimit) continue;
+          
+          for (let lb of lineupsB) {
+              if (!forceFill && lb.invalidCount > 0) continue;
+              if (!forceFill && processRolesAndCountAtk(lb) < appliedAtkLimit) continue;
+              
+              validPair = { a: la, b: lb };
+              break; 
+          }
+          if (validPair) break;
       }
 
-      const finalPenalty = metrics.penaltyScore + distributionPenalty;
+      if (!validPair) continue; 
+
+      const bestA = validPair.a;
+      const bestB = validPair.b;
+
+      bestA.stats = calculateTeamStatsLineup(bestA.lineup);
+      bestB.stats = calculateTeamStatsLineup(bestB.lineup);
+      
+      const normA = bestA.stats.normalized;
+      const normB = bestB.stats.normalized;
+
+      const statCount = havaLowPriority ? 5 : 6;
+      let sumNormA = normA.pas + normA.savunma + normA.sut + normA.dribling + normA.firsat;
+      let sumNormB = normB.pas + normB.savunma + normB.sut + normB.dribling + normB.firsat;
+      
+      if (!havaLowPriority) {
+          sumNormA += normA.hava;
+          sumNormB += normA.hava;
+      }
+      
+      const ovrA = sumNormA / statCount;
+      const ovrB = sumNormB / statCount;
+
+      if (!forceFill && (ovrA < targetScore || ovrB < targetScore)) {
+          continue;
+      }
+
+      const metrics = calculateBalanceMetrics(normA, normB, bestA.invalidCount, bestB.invalidCount, ovrA, ovrB, bestA, bestB, havaLowPriority);
+
+      if (metrics.penaltyScore > 500000 && !forceFill) continue;
 
       validResults.push({
           squad: { teamA, teamB, metrics },
           lineupA: bestA,
           lineupB: bestB,
-          penalty: finalPenalty, 
-          rawPenalty: finalPenalty, 
-          quality: statsA.totalOvr + statsB.totalOvr
+          penalty: metrics.penaltyScore, 
+          rawPenalty: metrics.penaltyScore,
+          targetScore: targetScore, 
+          sumA: ovrA, 
+          sumB: ovrB
       });
   }
 

@@ -1,20 +1,19 @@
-import { getAllSquads, getBestRoleForStats } from './algorithm.js';
+import { getAllSquads, getBestRoleForStats, calculateTeamStatsLineup } from './algorithm.js';
 import { ROLE_WEIGHTS, CONDITIONS } from './constants.js'; 
 
-window.getStatColor = function(val) {
+function getStatColor(val) {
     val = Number(val) || 0; 
     if (val >= 85) return '#00d2d3'; 
     if (val >= 65) return '#2ecc71'; 
     if (val >= 30) return '#f39c12'; 
     return '#e74c3c';                
-};
+}
 
 window.addEventListener('error', (e) => {
     console.error("Sistem Hatası Yakalandı: ", e.message);
 });
 
-// FM Tarzı Dinamik Kalp Çizimi
-window.getConditionHeart = (cond, size = 22) => {
+function getConditionHeart(cond, size = 22) {
     let color, darkColor, percent;
     if (cond === 'Tam') { color = '#00e676'; darkColor = '#0a381f'; percent = 100; } 
     else if (cond === 'İyi') { color = '#a8e63d'; darkColor = '#2a3b10'; percent = 80; } 
@@ -36,7 +35,7 @@ window.getConditionHeart = (cond, size = 22) => {
               <path fill="url(#grad-${uid})" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
               <polyline points="5.5,11 8.5,11 10.5,6.5 13.5,16 15.5,11 18.5,11" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />
             </svg>`;
-};
+}
 
 const DEFAULT_ROLE_WEIGHTS = JSON.parse(JSON.stringify(ROLE_WEIGHTS));
 try {
@@ -70,6 +69,9 @@ let currentPlayers = [];
 let editingPlayerId = null;
 let chartInstances = {};
 
+let simResults = []; 
+let simCharts = {};  
+
 const ALL_POSITIONS = ["GK", "CB", "LB", "RB", "LWB", "RWB", "DM", "CM", "AM", "LM", "RM", "LW", "RW", "FW"];
 
 function getBasePosition(slot) {
@@ -81,11 +83,224 @@ function updateCondPreview() {
     const pCondEl = document.getElementById('pCond');
     const previewEl = document.getElementById('condIconPreview');
     if (pCondEl && previewEl) {
-        previewEl.innerHTML = window.getConditionHeart(pCondEl.value, 22);
+        previewEl.innerHTML = getConditionHeart(pCondEl.value, 22);
     }
 }
 
+function updateFormationName(lineupObj) {
+    let counts = { D: 0, DM: 0, M: 0, AM: 0, F: 0 };
+    lineupObj.lineup.forEach(item => {
+        if (item.slot === 'GK') return;
+        const b = item.basePos;
+        if (['CB','LB','RB','LWB','RWB'].includes(b)) counts.D++;
+        else if (['DM'].includes(b)) counts.DM++;
+        else if (['CM','LM','RM'].includes(b)) counts.M++;
+        else if (['AM'].includes(b)) counts.AM++;
+        else if (['FW','LW','RW'].includes(b)) counts.F++;
+    });
+    const parts = [];
+    if(counts.D > 0) parts.push(counts.D);
+    if(counts.DM > 0) parts.push(counts.DM);
+    if(counts.M > 0) parts.push(counts.M);
+    if(counts.AM > 0) parts.push(counts.AM);
+    if(counts.F > 0) parts.push(counts.F);
+    lineupObj.formationName = parts.join('-');
+}
+
+window.renderStatRow = function(label, normA, normB) {
+    const rA = Math.round(normA);
+    const rB = Math.round(normB);
+    const diff = rA - rB;
+    
+    let diffColor = 'var(--text-main)';
+    let diffText = '0';
+    
+    if (diff > 0) { diffColor = '#3498db'; diffText = `+${diff}`; } 
+    else if (diff < 0) { diffColor = '#e74c3c'; diffText = `${diff}`; }
+    
+    return `
+        <tr style="border-bottom: 1px dashed var(--border-color);">
+            <td style="color: var(--text-muted); text-align: left; padding: 8px;">${label}</td>
+            <td style="color: var(--text-main); font-weight: bold; padding: 8px; font-size:1.1em;">${rA}</td>
+            <td style="color: var(--text-main); font-weight: bold; padding: 8px; font-size:1.1em;">${rB}</td>
+            <td style="color: ${diffColor}; font-weight: bold; padding: 8px;">${diffText}</td>
+        </tr>
+    `;
+};
+
+window.handlePlayerSwap = function(src, tgt) {
+    const cardIndex = parseInt(src.card);
+    if (!simResults[cardIndex]) return;
+    const data = simResults[cardIndex].active;
+
+    const getLineupItem = (teamStr, slotStr) => {
+        const lineup = teamStr === 'A' ? data.lineupA.lineup : data.lineupB.lineup;
+        return lineup.find(i => i.slot === slotStr);
+    };
+
+    const srcItem = getLineupItem(src.team, src.slot);
+    const tgtItem = getLineupItem(tgt.team, tgt.slot); 
+
+    if (!srcItem) return;
+
+    const reEvaluate = (item) => {
+        const p = item.player;
+        const basePos = item.basePos;
+        item.isMain = getBasePosition(p.mainPos) === basePos;
+        const secObj = p.secondaryPositions.find(sp => getBasePosition(sp.pos) === basePos);
+        item.isSec = !!secObj;
+
+        item.outOfPos = (p.bannedPositions && p.bannedPositions.includes(basePos)) || (p.bannedPositions && p.bannedPositions.includes(item.slot));
+        if (!item.isMain && !item.isSec) item.outOfPos = true;
+
+        if (item.outOfPos) {
+            item.cap = 25; 
+            item.role = getBestRoleForStats(basePos, p.stats);
+        } else if (item.isMain) {
+            item.cap = 100;
+            item.role = (!p.role || p.role === 'null') ? getBestRoleForStats(basePos, p.stats) : p.role;
+        } else if (item.isSec) {
+            item.cap = secObj.capacity;
+            item.role = (!secObj.role || secObj.role === 'null') ? getBestRoleForStats(basePos, p.stats) : secObj.role;
+        }
+        item.pOvr = getOvrForPosition(p, item.slot, item.role, item.cap, false);
+    };
+
+    if (tgtItem) {
+        const tempPlayer = srcItem.player;
+        srcItem.player = tgtItem.player;
+        tgtItem.player = tempPlayer;
+
+        reEvaluate(srcItem);
+        reEvaluate(tgtItem);
+    } else {
+        if (src.team !== tgt.team) {
+            alert("Sayı eksilmemesi için takım değiştirirken oyuncuyu BOŞ bir mevkiye değil, TAKAS etmek istediğiniz oyuncunun üzerine bırakın.");
+            return;
+        }
+        
+        srcItem.slot = tgt.slot;
+        srcItem.basePos = getBasePosition(tgt.slot);
+        reEvaluate(srcItem);
+        
+        updateFormationName(data.lineupA);
+        updateFormationName(data.lineupB);
+    }
+
+    const statsA = calculateTeamStatsLineup(data.lineupA.lineup);
+    const statsB = calculateTeamStatsLineup(data.lineupB.lineup);
+    
+    data.lineupA.stats = statsA;
+    data.lineupB.stats = statsB;
+
+    const isHavaLow = document.getElementById('cbLowHava')?.checked;
+    const statCount = isHavaLow ? 5 : 6;
+    
+    let sumA_total = statsA.normalized.pas + statsA.normalized.savunma + statsA.normalized.sut + statsA.normalized.dribling + statsA.normalized.firsat;
+    let sumB_total = statsB.normalized.pas + statsB.normalized.savunma + statsB.normalized.sut + statsB.normalized.dribling + statsB.normalized.firsat;
+    
+    if (!isHavaLow) {
+        sumA_total += statsA.normalized.hava;
+        sumB_total += statsB.normalized.hava;
+    }
+    
+    data.sumA = sumA_total / statCount;
+    data.sumB = sumB_total / statCount;
+    data.rawPenalty = Math.abs(data.sumA - data.sumB) * 1000.0;
+
+    document.body.classList.remove('is-dragging');
+    renderSimCard(cardIndex);
+};
+
+document.addEventListener('dragstart', (e) => {
+    const playerEl = e.target.closest('.pitch-player');
+    if (playerEl && playerEl.dataset.card) {
+        e.dataTransfer.setData('text/plain', JSON.stringify({
+            card: playerEl.dataset.card,
+            team: playerEl.dataset.team,
+            slot: playerEl.dataset.slot
+        }));
+        e.dataTransfer.effectAllowed = 'move';
+        playerEl.style.opacity = '0.4';
+        
+        document.body.classList.add('is-dragging');
+    }
+});
+
+document.addEventListener('dragend', (e) => {
+    const playerEl = e.target.closest('.pitch-player');
+    if (playerEl) playerEl.style.opacity = '1';
+    
+    document.body.classList.remove('is-dragging');
+    document.querySelectorAll('.pitch-empty-slot').forEach(el => {
+        el.style.opacity = '0';
+        el.style.pointerEvents = 'none';
+        el.style.borderColor = 'rgba(255,255,255,0.4)';
+        el.style.background = 'rgba(0,0,0,0.2)';
+    });
+});
+
+document.addEventListener('dragover', (e) => {
+    const dropTarget = e.target.closest('.pitch-player, .pitch-empty-slot');
+    if (dropTarget) {
+        e.preventDefault(); 
+        e.dataTransfer.dropEffect = 'move';
+        if (dropTarget.classList.contains('pitch-empty-slot')) {
+            dropTarget.style.borderColor = '#2ecc71';
+            dropTarget.style.background = 'rgba(46, 204, 113, 0.4)';
+        }
+    }
+});
+
+document.addEventListener('dragleave', (e) => {
+    const emptySlot = e.target.closest('.pitch-empty-slot');
+    if (emptySlot) {
+        emptySlot.style.borderColor = 'rgba(255,255,255,0.4)';
+        emptySlot.style.background = 'rgba(0,0,0,0.2)';
+    }
+});
+
+document.addEventListener('drop', (e) => {
+    document.body.classList.remove('is-dragging');
+
+    const targetEl = e.target.closest('.pitch-player, .pitch-empty-slot');
+    if (targetEl && targetEl.dataset.card) {
+        e.preventDefault();
+        
+        document.querySelectorAll('.pitch-empty-slot').forEach(el => {
+            el.style.opacity = '0';
+            el.style.pointerEvents = 'none';
+            el.style.borderColor = 'rgba(255,255,255,0.4)';
+            el.style.background = 'rgba(0,0,0,0.2)';
+        });
+        
+        const rawData = e.dataTransfer.getData('text/plain');
+        if (!rawData) return;
+        try {
+            const sourceData = JSON.parse(rawData);
+            const targetData = {
+                card: targetEl.dataset.card,
+                team: targetEl.dataset.team,
+                slot: targetEl.dataset.slot
+            };
+            if (sourceData.card === targetData.card && (sourceData.team !== targetData.team || sourceData.slot !== targetData.slot)) {
+                window.handlePlayerSwap(sourceData, targetData);
+            }
+        } catch(err) { console.error("Swap Hatası:", err); }
+    }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
+    if (!document.getElementById('drag-styles')) {
+        const ds = document.createElement('style');
+        ds.id = 'drag-styles';
+        ds.innerHTML = `
+            .pitch-empty-slot { opacity: 0; pointer-events: none; transition: opacity 0.2s ease, background 0.2s ease, border-color 0.2s ease; }
+            body.is-dragging .pitch-empty-slot { opacity: 1 !important; pointer-events: auto !important; }
+        `;
+        document.head.appendChild(ds);
+    }
+
     const livePitchWrap = document.getElementById('livePitchWrap');
     if (livePitchWrap) livePitchWrap.style.display = 'none'; 
 
@@ -217,6 +432,17 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('matchFormat')?.addEventListener('change', updatePlayerList);
 
     document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('btn-reset-sim')) {
+            e.preventDefault();
+            document.body.classList.remove('is-dragging');
+            const cardIndex = parseInt(e.target.dataset.card);
+            if (simResults[cardIndex]) {
+                simResults[cardIndex].active = JSON.parse(JSON.stringify(simResults[cardIndex].original));
+                renderSimCard(cardIndex);
+            }
+            return;
+        }
+
         const pitchNode = e.target.closest('.pitch-node-clickable');
         if (pitchNode) {
             e.preventDefault(); e.stopPropagation(); 
@@ -252,7 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentPlayers = currentPlayers.filter(p => String(p.id) !== String(e.target.dataset.id)); updatePlayerList();
         }
         if (e.target.classList.contains('btn-edit')) {
-            editPlayer(Number(e.target.dataset.id));
+            editPlayer(e.target.dataset.id);
         }
     });
 
@@ -529,12 +755,15 @@ function getEffectivePlayerInfo(player, applyCondition = false) {
     const banned = player.bannedPositions || [];
     const isMainBanned = banned.includes(mainPos) || banned.includes(mainBase);
 
+    let activeRole = player.role;
+    if (!activeRole || activeRole === 'null') activeRole = getBestRoleForStats(mainBase, player.stats);
+
     if (!isMainBanned) {
         return { 
             original: mainPos, 
             active: mainPos, 
-            activeRole: player.role, 
-            ovr: getOvrForPosition(player, mainPos, player.role, 100, applyCondition), 
+            activeRole: activeRole, 
+            ovr: getOvrForPosition(player, mainPos, activeRole, 100, applyCondition), 
             isBanned: false 
         };
     }
@@ -544,8 +773,11 @@ function getEffectivePlayerInfo(player, applyCondition = false) {
         player.secondaryPositions.forEach(sp => {
             const spBase = getBasePosition(sp.pos);
             if (!banned.includes(sp.pos) && !banned.includes(spBase)) {
-                const ovr = getOvrForPosition(player, sp.pos, sp.role, sp.capacity, applyCondition);
-                if (ovr > bestOvr) { bestOvr = ovr; bestSec = sp.pos; bestRole = sp.role; }
+                let spRole = sp.role;
+                if (!spRole || spRole === 'null') spRole = getBestRoleForStats(spBase, player.stats);
+                
+                const ovr = getOvrForPosition(player, sp.pos, spRole, sp.capacity, applyCondition);
+                if (ovr > bestOvr) { bestOvr = ovr; bestSec = sp.pos; bestRole = spRole; }
             }
         });
     }
@@ -572,7 +804,7 @@ function openPlayerModal(info) {
             <b>Mevki:</b> ${info.basePos} | 
             <b>Rol:</b> <span style="color:#2ecc71;">${info.role}</span> <br>
             <b>Mevki Kapasitesi:</b> <span style="color:${info.cap===100?'#2ecc71':(info.cap>50?'#f39c12':'#e74c3c')};">%${info.cap}</span> | 
-            <b>Kondisyon:</b> <span style="margin-right:5px;">${window.getConditionHeart(info.cond)}</span> ${info.cond} (Çarpan: x${condMulti})
+            <b>Kondisyon:</b> <span style="margin-right:5px;">${getConditionHeart(info.cond)}</span> ${info.cond} (Çarpan: x${condMulti})
         </div>
         <div style="font-weight:bold; color:#f39c12; margin-bottom:10px;">Takım Dengesine Bireysel Katkı Analizi:</div>
         <table class="sim-stat-table" style="width:100%; text-align:left; border-collapse:collapse; font-size:0.95em;">
@@ -585,31 +817,34 @@ function openPlayerModal(info) {
     `;
     
     let totalContrib = 0;
-    for (const [stat, weight] of Object.entries(info.weights)) {
-        if (weight > 0) {
-            const raw = info.stats[stat] || 0;
-            
-            // 🔥 HANGİ ÖZELLİKLER ETKİLENMİYOR? 🔥
-            // Eğer oyuncu GK olarak sahaya çıkıyorsa ve özellik Savunma, Dribling, Hava DEĞİLSE kondisyondan muaf olur.
-            const isExempt = info.basePos === 'GK' && !['savunma', 'dribling', 'hava'].includes(stat);
-            const currentCondMulti = isExempt ? 1.0 : condMulti;
-            
-            const effective = raw * (weight/100) * (info.cap/100) * currentCondMulti;
-            totalContrib += effective;
-            
-            const statName = statLabels[stat] || stat;
-            
-            // Etkilenmeyen tüm özelliklerin (Pas, Fırsat, Şut, ŞutK) altına uyarı ekleniyor
-            const shieldNote = (isExempt && condMulti !== 1.0) ? `<br><span style="font-size:0.7em; color:#f39c12;">(Kondisyondan Etkilenmez)</span>` : ``;
+    const keys = info.basePos === 'GK' ? ['pas', 'savunma', 'sutKarsilama', 'dribling', 'firsat', 'hava'] : ['pas', 'savunma', 'sut', 'dribling', 'firsat', 'hava'];
+    
+    keys.forEach(stat => {
+        const weight = info.weights[stat] || 0;
+        let raw = info.stats[stat] !== undefined ? info.stats[stat] : 0;
+        
+        if (stat === 'sut' && raw === 0) raw = info.stats['şut'] || 0;
+        if (stat === 'firsat' && raw === 0) raw = info.stats['fırsat'] || 0;
 
-            detailsHtml += `<tr>
-                <td style="padding:8px; font-weight:bold;">${statName}</td>
-                <td style="padding:8px; font-weight:bold; text-align:center;">${raw}</td>
-                <td style="padding:8px; color:var(--text-muted);">%${weight}</td>
-                <td style="padding:8px; color:#2ecc71; font-weight:bold;">+${effective.toFixed(1)}${shieldNote}</td>
-            </tr>`;
-        }
-    }
+        const isExempt = info.basePos === 'GK' && !['savunma', 'dribling', 'hava'].includes(stat);
+        const currentCondMulti = isExempt ? 1.0 : condMulti;
+        
+        const effective = raw * (weight/100) * (info.cap/100) * currentCondMulti;
+        totalContrib += effective;
+        
+        const statName = statLabels[stat] || stat;
+        
+        const shieldNote = (isExempt && condMulti !== 1.0 && weight > 0) ? `<br><span style="font-size:0.7em; color:#f39c12;">(Kondisyondan Etkilenmez)</span>` : ``;
+        const rowStyle = weight === 0 ? "opacity: 0.5;" : "";
+
+        detailsHtml += `<tr style="${rowStyle}">
+            <td style="padding:8px; font-weight:bold;">${statName}</td>
+            <td style="padding:8px; font-weight:bold; text-align:center;">${raw}</td>
+            <td style="padding:8px; color:var(--text-muted);">%${weight}</td>
+            <td style="padding:8px; color:#2ecc71; font-weight:bold;">+${effective.toFixed(1)}${shieldNote}</td>
+        </tr>`;
+    });
+
     detailsHtml += `</table>
     <div style="margin-top:20px; display:flex; justify-content:space-between; align-items:center;">
         <div style="font-size:1.2em; font-weight: bold;">Toplam OVR Katkısı: <b style="color:#27ae60; font-size:1.3em;">${totalContrib.toFixed(1)}</b></div>
@@ -622,16 +857,18 @@ function openPlayerModal(info) {
 
 function generateMiniPitchHTML(player, width = "140px") {
     const baseSlotCoords = { 
-        "FW": {x: 50, y: 10}, "LW": {x: 15, y: 25}, "AM": {x: 50, y: 25}, "RW": {x: 85, y: 25}, 
-        "LM": {x: 15, y: 40}, "CM": {x: 50, y: 40}, "RM": {x: 85, y: 40}, 
-        "LWB": {x: 15, y: 55}, "DM": {x: 50, y: 55}, "RWB": {x: 85, y: 55}, 
-        "LB": {x: 15, y: 70}, "CB": {x: 50, y: 70}, "RB": {x: 85, y: 70}, 
-        "GK": {x: 50, y: 85} 
+        "FW": {x: 50, y: 12}, "LW": {x: 10, y: 27}, "AM": {x: 50, y: 27}, "RW": {x: 90, y: 27}, 
+        "LM": {x: 10, y: 42}, "CM": {x: 50, y: 42}, "RM": {x: 90, y: 42}, 
+        "LWB": {x: 10, y: 57}, "DM": {x: 50, y: 57}, "RWB": {x: 90, y: 57}, 
+        "LB": {x: 10, y: 72}, "CB": {x: 50, y: 72}, "RB": {x: 90, y: 72}, 
+        "GK": {x: 50, y: 87} 
     };
     
     let nodesHTML = '';
     const mainPos = getBasePosition(player.mainPos);
-    const mainRole = player.role || 'Standart';
+    let mainRole = player.role;
+    if (!mainRole || mainRole === 'null') mainRole = getBestRoleForStats(mainPos, player.stats);
+    
     const secPositions = player.secondaryPositions || [];
     const bannedPositions = player.bannedPositions || [];
     const pid = player.id || ''; 
@@ -651,12 +888,14 @@ function generateMiniPitchHTML(player, width = "140px") {
         } else if (isMain) {
             const ovr = getOvrForPosition(player, pos, mainRole, 100, false);
             bgColor = '#00d2d3'; border = '2px solid white'; content = pos; size = 24; zIndex = 8; opacity = 1;
-            tooltipText = `<b>${pos} (Ana)</b><br><span style="color:#f39c12;">${mainRole || 'Rol Seçilmedi'}</span><br><span style="color:${window.getStatColor(ovr)};">${ovr} OVR</span>`;
+            tooltipText = `<b>${pos} (Ana)</b><br><span style="color:#f39c12;">${mainRole}</span><br><span style="color:${getStatColor(ovr)};">${ovr} OVR</span>`;
         } else if (isSec) {
-            const ovr = getOvrForPosition(player, pos, secObj.role, secObj.capacity, false);
+            let sRole = secObj.role;
+            if (!sRole || sRole === 'null') sRole = getBestRoleForStats(pos, player.stats);
+            const ovr = getOvrForPosition(player, pos, sRole, secObj.capacity, false);
             bgColor = secObj.capacity === 100 ? '#00d2d3' : `hsl(${Math.floor((secObj.capacity / 100) * 120)}, 80%, 45%)`;
             border = '1px solid white'; content = pos; size = 20; zIndex = 7; opacity = 1;
-            tooltipText = `<b>${pos} (Yan) - %${secObj.capacity}</b><br><span style="color:#f39c12;">${secObj.role || 'Rol Seçilmedi'}</span><br><span style="color:${window.getStatColor(ovr)};">${ovr} OVR</span>`;
+            tooltipText = `<b>${pos} (Yan) - %${secObj.capacity}</b><br><span style="color:#f39c12;">${sRole}</span><br><span style="color:${getStatColor(ovr)};">${ovr} OVR</span>`;
         } else {
             bgColor = 'rgba(255,255,255,0.1)'; border = '1px dashed rgba(255,255,255,0.4)'; content = ''; size = 16; zIndex = 5; opacity = 0.6;
             tooltipText = `<b>${pos}</b><br><span style="color:var(--text-muted);">(Kapat)</span>`;
@@ -679,59 +918,69 @@ function generateMiniPitchHTML(player, width = "140px") {
         </div>`;
 }
 
-function generateTacticalPitchHTML(lineup, title, teamColor = '#00d2d3', teamType = 'A') {
+function generateTacticalPitchHTML(lineup, title, teamColor = '#00d2d3', teamType = 'A', cardIndex = 0) {
     if (!lineup) return '';
     
     const useTeamColors = document.getElementById('cbTeamColors')?.checked;
 
     const slotCoords = { 
-        "LFW": {x: 25, y: 10}, "FW": {x: 50, y: 10}, "RFW": {x: 75, y: 10}, 
-        "LW": {x: 15, y: 25}, "LAM": {x: 35, y: 25}, "AM": {x: 50, y: 25}, "RAM": {x: 65, y: 25}, "RW": {x: 85, y: 25}, 
-        "LM": {x: 15, y: 40}, "LCM": {x: 35, y: 40}, "CM": {x: 50, y: 40}, "RCM": {x: 65, y: 40}, "RM": {x: 85, y: 40}, 
-        "LWB": {x: 15, y: 55}, "LDM": {x: 35, y: 55}, "DM": {x: 50, y: 55}, "RDM": {x: 65, y: 55}, "RWB": {x: 85, y: 55}, 
-        "LB": {x: 15, y: 70}, "LCB": {x: 35, y: 70}, "CB": {x: 50, y: 70}, "RCB": {x: 65, y: 70}, "RB": {x: 85, y: 70}, 
-        "GK": {x: 50, y: 85} 
+        "LFW": {x: 20, y: 12}, "FW": {x: 50, y: 12}, "RFW": {x: 80, y: 12}, 
+        "LW": {x: 10, y: 27}, "LAM": {x: 30, y: 27}, "AM": {x: 50, y: 27}, "RAM": {x: 70, y: 27}, "RW": {x: 90, y: 27}, 
+        "LM": {x: 10, y: 42}, "LCM": {x: 30, y: 42}, "CM": {x: 50, y: 42}, "RCM": {x: 70, y: 42}, "RM": {x: 90, y: 42}, 
+        "LWB": {x: 10, y: 57}, "LDM": {x: 30, y: 57}, "DM": {x: 50, y: 57}, "RDM": {x: 70, y: 57}, "RWB": {x: 90, y: 57}, 
+        "LB": {x: 10, y: 72}, "LCB": {x: 30, y: 72}, "CB": {x: 50, y: 72}, "RCB": {x: 70, y: 72}, "RB": {x: 90, y: 72}, 
+        "GK": {x: 50, y: 87} 
     };
     
     let playersHTML = '';
-    lineup.lineup.forEach(item => {
-        if (!item.player) return;
-        
-        const activeOvr = getOvrForPosition(item.player, item.slot, item.role, item.cap, true);
-        const weights = ROLE_WEIGHTS[item.basePos]?.[item.role] || {};
-        
-        const pinfo = { cond: item.player.condition, basePos: item.basePos, role: item.role, cap: item.cap, weights: weights, stats: item.player.stats, name: item.player.name, pOvr: item.pOvr };
-        const encodedInfo = encodeURIComponent(JSON.stringify(pinfo));
+    
+    Object.keys(slotCoords).forEach(slotKey => {
+        const posData = slotCoords[slotKey];
+        const item = lineup.lineup.find(i => i.slot === slotKey);
 
-        const posData = slotCoords[item.slot] || {x: 50, y: 50};
-        
-        let circleColor = teamColor; 
-        let warningIcon = '';
+        if (item && item.player) {
+            let effectiveRole = item.role;
+            if (!effectiveRole || effectiveRole === 'null') effectiveRole = getBestRoleForStats(item.basePos, item.player.stats);
+            
+            const activeOvr = getOvrForPosition(item.player, item.slot, effectiveRole, item.cap, true);
+            const weights = ROLE_WEIGHTS[item.basePos]?.[effectiveRole] || {};
+            const pinfo = { cond: item.player.condition, basePos: item.basePos, role: effectiveRole, cap: item.cap, weights: weights, stats: item.player.stats, name: item.player.name, pOvr: item.pOvr };
+            const encodedInfo = encodeURIComponent(JSON.stringify(pinfo));
+            
+            let circleColor = teamColor; 
+            let warningIcon = '';
 
-        if (item.outOfPos) { 
-            warningIcon = `<div class="pitch-player-alert" style="position:absolute; top:-8px; right:-8px; font-size:16px; text-shadow: 1px 1px 2px #000; z-index: 10;">⚠️</div>`; 
-            circleColor = '#e74c3c'; 
-        } else if (useTeamColors) {
-            circleColor = teamType === 'A' ? '#3498db' : '#e74c3c'; 
-        } else {
-            if (item.isMain || (item.isSec && item.cap === 100)) { circleColor = '#00d2d3'; } 
-            else if (item.isSec) { circleColor = `hsl(${Math.floor(((item.cap || 50) / 100) * 120)}, 80%, 45%)`; }
-        }
+            if (item.outOfPos) { 
+                warningIcon = `<div class="pitch-player-alert" style="position:absolute; top:-8px; right:-8px; font-size:16px; text-shadow: 1px 1px 2px #000; z-index: 10;">⚠️</div>`; 
+                circleColor = '#e74c3c'; 
+            } else if (useTeamColors) {
+                circleColor = teamType === 'A' ? '#3498db' : '#e74c3c'; 
+            } else {
+                if (item.isMain || (item.isSec && item.cap === 100)) { circleColor = '#00d2d3'; } 
+                else if (item.isSec) { circleColor = `hsl(${Math.floor(((item.cap || 50) / 100) * 120)}, 80%, 45%)`; }
+            }
 
-        const nameColor = item.player.isTest ? '#2ecc71' : 'white';
-        
-        playersHTML += `
-            <div class="pitch-player" data-pinfo="${encodedInfo}" style="position: absolute; left: ${posData.x}%; top: ${posData.y}%; z-index: 5;">
-                <div class="pitch-player-icon" style="background-color: ${circleColor};">${warningIcon}</div>
-                <div class="pitch-player-label">
-                    <div style="display: flex; justify-content: center; align-items: baseline; gap: 4px; margin-bottom: 2px;">
-                        <span style="color:#ecf0f1; font-weight:bold; font-size: 0.85em;">${item.slot}</span>
-                        <span class="pitch-ovr-text" style="color:${window.getStatColor(activeOvr)}; font-weight:bold; font-size: 1.1em; line-height: 1;">${activeOvr}</span>
-                        <span class="cond-icon" style="display: flex; align-items: center;">${window.getConditionHeart(item.player.condition, 14)}</span>
+            const nameColor = item.player.isTest ? '#2ecc71' : 'white';
+            
+            playersHTML += `
+                <div class="pitch-player" draggable="true" data-card="${cardIndex}" data-team="${teamType}" data-slot="${item.slot}" data-pinfo="${encodedInfo}" style="position: absolute; left: ${posData.x}%; top: ${posData.y}%; z-index: 5; cursor: grab; transition: transform 0.15s ease;">
+                    <div class="pitch-player-icon" style="background-color: ${circleColor};">${warningIcon}</div>
+                    <div class="pitch-player-label">
+                        <div style="display: flex; justify-content: center; align-items: baseline; gap: 4px; margin-bottom: 2px;">
+                            <span style="color:#ecf0f1; font-weight:bold; font-size: 0.85em;">${item.slot}</span>
+                            <span class="pitch-ovr-text" style="color:${getStatColor(activeOvr)}; font-weight:bold; font-size: 1.1em; line-height: 1;">${activeOvr}</span>
+                            <span class="cond-icon" style="display: flex; align-items: center;">${getConditionHeart(item.player.condition, 14)}</span>
+                        </div>
+                        <div style="white-space: normal; line-height: 1.1; font-size: 0.95em; color:${nameColor}; font-weight: 800;">${getPitchName(item.player, currentPlayers)}</div>
                     </div>
-                    <div style="white-space: normal; line-height: 1.1; font-size: 0.95em; color:${nameColor}; font-weight: 800;">${getPitchName(item.player, currentPlayers)}</div>
-                </div>
-            </div>`;
+                </div>`;
+        } else {
+            playersHTML += `
+                <div class="pitch-empty-slot custom-tooltip" data-card="${cardIndex}" data-team="${teamType}" data-slot="${slotKey}" style="position: absolute; left: ${posData.x}%; top: ${posData.y}%; z-index: 4; width: 36px; height: 36px; transform: translate(-50%, -50%); border: 2px dashed rgba(255,255,255,0.4); border-radius: 50%; background: rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; font-size: 0.9em; font-weight: bold; color: rgba(255,255,255,0.5); transition: opacity 0.2s ease, background 0.2s ease, border-color 0.2s ease;">
+                    
+                    <span class="tooltip-text">${slotKey} (Boş)</span>
+                </div>`;
+        }
     });
 
     const headerColor = teamType === 'A' ? '#3498db' : '#e74c3c';
@@ -774,12 +1023,11 @@ function updatePlayerList() {
             html += pList.map(p => {
                 const nameColor = p.isTest ? '#2ecc71' : 'inherit'; 
                 const displayNameHtml = p.shortName?.trim() ? ` <span style="color:var(--text-muted); font-size:0.85em;">(${p.shortName.trim()})</span>` : '';
-                const condHeart = window.getConditionHeart(p.condition);
+                const condHeart = getConditionHeart(p.condition);
                 
                 const effBase = getEffectivePlayerInfo(p, false);
                 const effActive = getEffectivePlayerInfo(p, true);
                 
-                // 🔥 SENİN DÜZELTTİĞİN KISIM EKLENDİ (Büyük harf "En İyi Mevki") 🔥
                 const posDisplay = effBase.isBanned ? `<s style="color:#e74c3c;">${effBase.original}</s> <span style="color:#e67e22; font-size:0.9em; font-weight:bold;">(En İyi Mevki: ${effBase.active})</span>` : `${effBase.original}`;
                 const roleDisplay = effBase.isBanned && effBase.active !== 'Yok' ? `<span style="color:#1a6b2e;">(${effBase.activeRole})</span>` : `<span style="color:#1a6b2e;">(${p.role})</span>`;
 
@@ -789,17 +1037,17 @@ function updatePlayerList() {
 
                 const statsHtml = `
                   <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.95em; width: 100%;">
-                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>Hava Topu:</b> <span style="font-weight:bold; color:${window.getStatColor(havaVal)};">${havaVal}</span></div>
-                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>Pas D.:</b> <span style="font-weight:bold; color:${window.getStatColor(pasVal)};">${pasVal}</span></div>
-                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>Savunma:</b> <span style="font-weight:bold; color:${window.getStatColor(savVal)};">${savVal}</span></div>
-                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>${getBasePosition(p.mainPos)==='GK'?'Şut Karşılama':'Şut'}:</b> <span style="font-weight:bold; color:${window.getStatColor(sutVal)};">${sutVal}</span></div>
-                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>Dribling:</b> <span style="font-weight:bold; color:${window.getStatColor(dribVal)};">${dribVal}</span></div>
-                    <div style="display: flex; justify-content: space-between; padding-bottom: 0;"><b>Fırsat Y.:</b> <span style="font-weight:bold; color:${window.getStatColor(firsatVal)};">${firsatVal}</span></div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>Hava Topu:</b> <span style="font-weight:bold; color:${getStatColor(havaVal)};">${havaVal}</span></div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>Pas D.:</b> <span style="font-weight:bold; color:${getStatColor(pasVal)};">${pasVal}</span></div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>Savunma:</b> <span style="font-weight:bold; color:${getStatColor(savVal)};">${savVal}</span></div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>${getBasePosition(p.mainPos)==='GK'?'Şut Karşılama':'Şut'}:</b> <span style="font-weight:bold; color:${getStatColor(sutVal)};">${sutVal}</span></div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>Dribling:</b> <span style="font-weight:bold; color:${getStatColor(dribVal)};">${dribVal}</span></div>
+                    <div style="display: flex; justify-content: space-between; padding-bottom: 0;"><b>Fırsat Y.:</b> <span style="font-weight:bold; color:${getStatColor(firsatVal)};">${firsatVal}</span></div>
                   </div>
                 `;
 
                 const yanMevkilerHtml = p.secondaryPositions.length > 0 
-                    ? p.secondaryPositions.map(sp => `<span class="badge" style="background:${window.getStatColor(sp.capacity === 100 ? 85 : (sp.capacity>50?65:30))};">${sp.pos} (%${sp.capacity})</span>`).join('') 
+                    ? p.secondaryPositions.map(sp => `<span class="badge" style="background:${getStatColor(sp.capacity === 100 ? 85 : (sp.capacity>50?65:30))};">${sp.pos} (%${sp.capacity})</span>`).join('') 
                     : '<span style="font-size:0.85em; color:var(--text-muted);">Yok</span>';
 
                 let ovrBadgeText = `${effBase.ovr} OVR`;
@@ -813,7 +1061,7 @@ function updatePlayerList() {
                     <div style="display: flex; align-items: center; gap: 10px;">
                       <input type="checkbox" class="player-select-cb" data-id="${p.id}" ${p.selected ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer;">
                       <span style="${p.selected ? '' : 'text-decoration:line-through; opacity:0.5;'}">
-                        <b style="color:${nameColor};">${p.name}</b>${displayNameHtml} <span class="cond-icon">${condHeart}</span> <span class="pitch-ovr-text" style="background:${window.getStatColor(effBase.ovr)}; color:white; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding:2px 6px; border-radius:4px; font-size:0.8em; margin-left:4px;">${ovrBadgeText}</span> | ${posDisplay} ${roleDisplay}
+                        <b style="color:${nameColor};">${p.name}</b>${displayNameHtml} <span class="cond-icon">${condHeart}</span> <span class="pitch-ovr-text" style="background:${getStatColor(effBase.ovr)}; color:white; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding:2px 6px; border-radius:4px; font-size:0.8em; margin-left:4px;">${ovrBadgeText}</span> | ${posDisplay} ${roleDisplay}
                       </span>
                     </div>
                   </summary>
@@ -893,7 +1141,7 @@ function handleAddPlayer(e) {
 
     let existingBans = [];
     if (editingPlayerId) {
-        const ep = currentPlayers.find(p => p.id === editingPlayerId);
+        const ep = currentPlayers.find(p => String(p.id) === String(editingPlayerId));
         if (ep && ep.bannedPositions) existingBans = JSON.parse(JSON.stringify(ep.bannedPositions)); 
     }
 
@@ -913,7 +1161,7 @@ function handleAddPlayer(e) {
     });
 
     if (editingPlayerId) {
-        const index = currentPlayers.findIndex(p => p.id === editingPlayerId);
+        const index = currentPlayers.findIndex(p => String(p.id) === String(editingPlayerId));
         if (index !== -1) currentPlayers[index] = playerData;
         editingPlayerId = null;
         const btn = document.getElementById('btnAddPlayer'); 
@@ -990,7 +1238,7 @@ function updateLiveRoles() {
     });
 
     if (editingPlayerId) {
-        const index = currentPlayers.findIndex(p => p.id === editingPlayerId);
+        const index = currentPlayers.findIndex(p => String(p.id) === String(editingPlayerId));
         if (index !== -1) {
             currentPlayers[index].stats = statsObj;
             currentPlayers[index].mainPos = mainPos;
@@ -1079,17 +1327,112 @@ function renderPositionMap() {
     updateLiveRoles(); 
 }
 
-function generateOptimizationLog(lineupObj, teamName) {
-    let logs = [];
-    lineupObj.lineup.forEach(item => {
-        if (item.isSec) {
-            logs.push(`<li style="margin-bottom:4px;">${teamName}: <b>${item.player.name}</b> ana mevkisi dışında (<span style="color:#f39c12;">${item.slot}</span>) oynatıldı. (Kapasite: %${item.cap})</li>`);
-        } else if (item.outOfPos) {
-            logs.push(`<li style="margin-bottom:4px;">${teamName}: <b style="color:#e74c3c;">${item.player.name}</b> mecburen alakasız bir mevkide (<span style="color:#e74c3c;">${item.slot}</span>) oynatıldı!</li>`);
-        }
-    });
-    if (logs.length === 0) logs.push(`<li><span style="color:#2ecc71;">${teamName} takımındaki tüm oyuncular Ana Mevkilerinde oynuyor.</span></li>`);
-    return logs.join('');
+function renderSimCard(index) {
+    const container = document.getElementById(`sim-card-container-${index}`);
+    if (!container) return;
+
+    document.body.classList.remove('is-dragging');
+
+    const dataObj = simResults[index];
+    const data = dataObj.active;
+    
+    const isModified = JSON.stringify(dataObj.active.lineupA.lineup) !== JSON.stringify(dataObj.original.lineupA.lineup) || 
+                       JSON.stringify(dataObj.active.lineupB.lineup) !== JSON.stringify(dataObj.original.lineupB.lineup);
+
+    const trueStatsA = data.lineupA.stats.normalized;
+    const trueStatsB = data.lineupB.stats.normalized;
+
+    const resetBtnHtml = isModified ? `<button class="btn-reset-sim" data-card="${index}" style="margin-left:auto; background:#e74c3c; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-size:0.85em; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3); transition: all 0.2s;">🔄 Sıfırla</button>` : '';
+
+    let html = `
+    <div class="sim-result-card" style="border: ${isModified ? '2px solid #f39c12' : '1px solid var(--border-color)'}; transition: all 0.3s ease;">
+        <div style="color: #f39c12; font-weight: bold; font-size: 1.1em; margin-bottom: 15px; display:flex; align-items:center;">
+            ✨ SEÇENEK #${index + 1} 
+            <span style="font-size: 0.8em; color: var(--text-muted); margin-left:8px;">(Denge Skoru: ${(data.rawPenalty || data.penalty || 0).toFixed(0)})</span>
+            ${isModified ? '<span style="margin-left:8px; font-size:0.8em; color:#e74c3c;">(Değiştirildi)</span>' : ''}
+            ${resetBtnHtml}
+        </div>
+        
+        <div class="pitch-wrapper">
+            ${generateTacticalPitchHTML(data.lineupA, 'A Takımı', '#3498db', 'A', index)}
+            ${generateTacticalPitchHTML(data.lineupB, 'B Takımı', '#e74c3c', 'B', index)}
+        </div>
+        
+        <div class="sim-table-chart-wrap">
+            <div class="sim-table-wrap">
+                <table class="sim-stat-table" style="width: 100%; border-collapse: collapse; text-align: center; font-size: 0.95em;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid var(--border-color);">
+                            <th style="color:#f39c12; text-align: left; padding: 8px;">Özellik</th>
+                            <th style="color:#3498db; padding: 8px;">A Takımı (0-100)</th>
+                            <th style="color:#e74c3c; padding: 8px;">B Takımı (0-100)</th>
+                            <th style="color:#f39c12; padding: 8px;">Fark (A-B)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${renderStatRow('Hava Topu', trueStatsA.hava, trueStatsB.hava)}
+                        ${renderStatRow('Pas D.', trueStatsA.pas, trueStatsB.pas)}
+                        ${renderStatRow('Savunma', trueStatsA.savunma, trueStatsB.savunma)}
+                        ${renderStatRow('Şut', trueStatsA.sut, trueStatsB.sut)}
+                        ${renderStatRow('Dribling', trueStatsA.dribling, trueStatsB.dribling)}
+                        ${renderStatRow('Fırsat Y.', trueStatsA.firsat, trueStatsB.firsat)}
+                    </tbody>
+                </table>
+            </div>
+            <div class="sim-chart-wrap">
+                <canvas id="teamChart-${index}" style="width:100%; height:100%;"></canvas>
+            </div>
+        </div>
+
+        <details class="sim-log-details">
+            <summary style="font-weight: bold; color: #3498db; outline: none; list-style: none; cursor:pointer;">
+                <span style="display: flex; align-items: center; gap: 5px;">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>
+                    Algoritma Karar Dökümünü Göster
+                </span>
+            </summary>
+            <div class="sim-log-content">
+                <div style="margin-bottom: 5px;"><b>[🎯] Havuz Kalitesi OVR Barajı:</b> ${data.targetScore.toFixed(1)} OVR <span style="color:var(--text-muted); font-size: 0.9em;">(A: ${data.sumA.toFixed(1)} | B: ${data.sumB.toFixed(1)})</span></div>
+                <div style="margin-bottom: 5px;"><b>[⚖️] Takımlar Arası Net Güç Farkı:</b> <span style="color:${Math.abs(data.sumA - data.sumB) < 5 ? '#2ecc71' : '#e74c3c'};">${(Math.abs(data.sumA - data.sumB)).toFixed(1)}</span> Net Puan</div>
+                <div style="font-size:0.85em; color:var(--text-muted); margin-top:10px;">* Takımlar dizilişin hakkını verme (0-100) yüzdesine göre adil kıyaslanmıştır. Göbek boşluğu ve yetenek israfı dengeye etki eder.</div>
+            </div>
+        </details>
+    </div>`;
+
+    container.innerHTML = html;
+
+    if (simCharts && simCharts[index]) {
+        simCharts[index].destroy();
+    }
+    
+    const canvas = document.getElementById(`teamChart-${index}`);
+    if(canvas) {
+        simCharts[index] = new Chart(canvas.getContext('2d'), { 
+            type: 'radar', 
+            data: { 
+                labels: ['Hava', 'Pas D.', 'Sav', 'Şut', 'Dribling', 'Fırsat Y.'], 
+                datasets: [
+                    { label: 'A Takımı', data: [Math.round(trueStatsA.hava), Math.round(trueStatsA.pas), Math.round(trueStatsA.savunma), Math.round(trueStatsA.sut), Math.round(trueStatsA.dribling), Math.round(trueStatsA.firsat)], backgroundColor: 'rgba(52, 152, 219, 0.25)', borderColor: '#3498db', borderWidth: 2, pointBackgroundColor: '#3498db', pointRadius: 2 }, 
+                    { label: 'B Takımı', data: [Math.round(trueStatsB.hava), Math.round(trueStatsB.pas), Math.round(trueStatsB.savunma), Math.round(trueStatsB.sut), Math.round(trueStatsB.dribling), Math.round(trueStatsB.firsat)], backgroundColor: 'rgba(231, 76, 60, 0.25)', borderColor: '#e74c3c', borderWidth: 2, pointBackgroundColor: '#e74c3c', pointRadius: 2 }
+                ] 
+            }, 
+            options: { 
+                layout: { padding: 25 }, 
+                maintainAspectRatio: false, 
+                scales: { 
+                    r: { 
+                        min: 0, 
+                        max: 100,
+                        ticks: { display: false }, 
+                        grid: { color: 'rgba(127, 140, 141, 0.2)' }, 
+                        angleLines: { color: 'rgba(127, 140, 141, 0.2)' }, 
+                        pointLabels: { color: '#7f8c8d', font: { size: 12, weight: 'bold' } } 
+                    } 
+                }, 
+                plugins: { legend: { display: false } } 
+            } 
+        });
+    }
 }
 
 function runSimulation(e) {
@@ -1098,6 +1441,7 @@ function runSimulation(e) {
     const format = Number(document.getElementById('matchFormat')?.value || 7);
     const forceFill = document.getElementById('cbForceFill')?.checked || false; 
     const havaLowPriority = document.getElementById('cbLowHava')?.checked ?? true; 
+    
     const requiredPlayers = format * 2;
     const selectedPlayers = currentPlayers.filter(p => p.selected);
   
@@ -1107,28 +1451,6 @@ function runSimulation(e) {
     }
   
     output.innerHTML = '<div style="padding: 15px; font-weight:bold;">Tüm varyasyonlar hesaplanıyor, lütfen bekleyin... ⏳</div>';
-
-    const renderStatRow = (label, valA, valB, diff) => {
-        let diffColor = 'var(--text-main)';
-        let diffText = '0.0';
-        
-        if (diff > 0.05) {
-            diffColor = '#3498db'; 
-            diffText = `+${diff.toFixed(1)}`;
-        } else if (diff < -0.05) {
-            diffColor = '#e74c3c'; 
-            diffText = `${Math.abs(diff).toFixed(1)}`; 
-        }
-        
-        return `
-            <tr style="border-bottom: 1px dashed var(--border-color);">
-                <td style="color: var(--text-muted); text-align: left; padding: 8px;">${label}</td>
-                <td style="color: var(--text-main); font-weight: bold; padding: 8px;">${(valA || 0).toFixed(1)}</td>
-                <td style="color: var(--text-main); font-weight: bold; padding: 8px;">${(valB || 0).toFixed(1)}</td>
-                <td style="color: ${diffColor}; font-weight: bold; padding: 8px;">${diffText}</td>
-            </tr>
-        `;
-    };
 
     setTimeout(() => {
         try {
@@ -1144,81 +1466,30 @@ function runSimulation(e) {
               if (gkCount < 2 && !forceFill) {
                   output.innerHTML = `<span style="background:#c0392b; color:white; padding:15px; border-radius:4px; line-height:1.6; display:block;">❌ <b>TAKIM BULUNAMADI! (KALECİ EKSİĞİ)</b><br>Kadro kurmak için en az 2 kaleciye (veya yan mevkisi kaleci olan oyuncuya) ihtiyaç var. Şu an seçili oyunculardan sadece <b>${gkCount} kişi</b> kaleye geçebiliyor.<br><br>Lütfen havuza kaleci ekleyin, kaleci oynamayı veto edenlerin yasağını kaldırın veya <i>'Her Zaman Kadro Bul'</i> seçeneğini işaretleyin.</span>`;
               } else {
-                  output.innerHTML = `<span style="background:#c0392b; color:white; padding:15px; border-radius:4px; line-height:1.6; display:block;">❌ <b>TAKIM BULUNAMADI!</b><br>Seçilen oyuncuların 'Kapalı (Kırmızı X)' mevkileri veya yetersiz yan mevkileri yüzünden geçerli bir diziliş üretilemiyor. Lütfen veto edilen mevkileri azaltın veya <i>'Her Zaman Kadro Bul'</i> ayarını işaretleyin.</span>`;
+                  output.innerHTML = `<span style="background:#c0392b; color:white; padding:15px; border-radius:4px; line-height:1.6; display:block;">❌ <b>TAKIM BULUNAMADI!</b><br>Seçilen oyuncuların 'Kapalı (Kırmızı X)' mevkileri, yetersiz yan mevkileri <b>veya sistemin belirlediği Dinamik Hedef Kalite barajı</b> yüzünden geçerli bir diziliş üretilemiyor. Lütfen veto edilen mevkileri azaltın veya <i>'Her Zaman Kadro Bul'</i> ayarını işaretleyin.</span>`;
               }
               return;
           }
+
+          simResults = validSquads.slice(0, 5).map(sq => ({
+              original: JSON.parse(JSON.stringify(sq)),
+              active: JSON.parse(JSON.stringify(sq))
+          }));
+          simCharts = {};
           
-          let html = `<h3>📊 EN DENGELİ KADROLAR (Toplam ${validSquads.length} İhtimal Bulundu)</h3>`;
+          let html = `<h3>📊 EN DENGELİ KADROLAR (Toplam ${validSquads.length} İhtimal Bulundu)</h3><div id="sim-cards-main-container">`;
 
-          for(let index = 0; index < Math.min(5, validSquads.length); index++) {
-            const data = validSquads[index];
-            const diffs = data.squad.metrics.diffs;
-            const trueStatsA = data.lineupA.stats;
-            const trueStatsB = data.lineupB.stats;
-
-            html += `
-            <div class="sim-result-card">
-                <div style="color: #f39c12; font-weight: bold; font-size: 1.1em; margin-bottom: 15px;">✨ SEÇENEK #${index + 1} <span style="font-size: 0.8em; color: var(--text-muted);"> (Denge Skoru: ${(data.rawPenalty || data.penalty || 0).toFixed(0)})</span></div>
-                
-                <div class="pitch-wrapper">
-                    ${generateTacticalPitchHTML(data.lineupA, `A Takımı`, '#3498db', 'A')}
-                    ${generateTacticalPitchHTML(data.lineupB, `B Takımı`, '#e74c3c', 'B')}
-                </div>
-                
-                <div class="sim-table-chart-wrap">
-                    <div class="sim-table-wrap">
-                        <table class="sim-stat-table" style="width: 100%; border-collapse: collapse; text-align: center; font-size: 0.95em;">
-                            <thead>
-                                <tr style="border-bottom: 2px solid var(--border-color);">
-                                    <th style="color:#f39c12; text-align: left; padding: 8px;">Özellik</th>
-                                    <th style="color:#3498db; padding: 8px;">A Takımı</th>
-                                    <th style="color:#e74c3c; padding: 8px;">B Takımı</th>
-                                    <th style="color:#f39c12; padding: 8px;">Fark (A-B)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${renderStatRow('Genel Güç (OVR)', trueStatsA.totalOvr, trueStatsB.totalOvr, diffs.ovr)}
-                                ${renderStatRow('Hava Topu', trueStatsA.hava, trueStatsB.hava, diffs.hava)}
-                                ${renderStatRow('Pas D.', trueStatsA.pas, trueStatsB.pas, diffs.pas)}
-                                ${renderStatRow('Savunma', trueStatsA.savunma, trueStatsB.savunma, diffs.savunma)}
-                                ${renderStatRow('Şut', trueStatsA.sut, trueStatsB.sut, diffs.sut)}
-                                ${renderStatRow('Dribling', trueStatsA.dribling, trueStatsB.dribling, diffs.dribling)}
-                                ${renderStatRow('Fırsat Y.', trueStatsA.firsat, trueStatsB.firsat, diffs.firsat)}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="sim-chart-wrap">
-                        <canvas id="teamChart-${index}" style="width:100%; height:100%;"></canvas>
-                    </div>
-                </div>
-
-                <details class="sim-log-details">
-                    <summary style="font-weight: bold; color: #3498db; outline: none; list-style: none;">
-                        <span style="display: flex; align-items: center; gap: 5px;">
-                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>
-                            Algoritma Karar Dökümünü Göster
-                        </span>
-                    </summary>
-                    <div class="sim-log-content">
-                        <div style="margin-bottom: 5px;"><b>[!] Taktiksel Boşluk (Grid) Cezası:</b> A Takımı (<span style="color:#e74c3c;">${(data.lineupA.gridPenalty || 0).toFixed(0)}</span>) | B Takımı (<span style="color:#e74c3c;">${(data.lineupB.gridPenalty || 0).toFixed(0)}</span>)</div>
-                        <div style="margin-bottom: 10px;"><b>[!] Stat Dengesizliği Cezası:</b> <span style="color:#e74c3c;">${((data.rawPenalty || data.penalty || 0) - (data.lineupA.gridPenalty || 0) - (data.lineupB.gridPenalty || 0)).toFixed(0)}</span> Puan</div>
-                        <div><b>[ℹ] Mevki Optimizasyonları (Fedakarlıklar):</b></div>
-                        <ul style="margin: 5px 0 0 0; padding-left: 20px; list-style-type: square;">
-                            ${generateOptimizationLog(data.lineupA, 'A Takımı')}
-                            ${generateOptimizationLog(data.lineupB, 'B Takımı')}
-                        </ul>
-                    </div>
-                </details>
-            </div>`;
+          for(let index = 0; index < simResults.length; index++) {
+              html += `<div id="sim-card-container-${index}"></div>`;
           }
+          
+          html += `</div>`; 
 
           if (validSquads.length > 5) {
               html += `<div style="margin-top: 30px;"><h4 style="border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">📋 DİĞER ALTERNATİF KADROLAR (${validSquads.length - 5} Adet)</h4><div style="display: flex; flex-direction: column; gap: 10px;">`;
               for (let i = 5; i < validSquads.length; i++) {
                   const data = validSquads[i];
-                  
-                  const formatPlayer = p => `<span style="white-space:nowrap;">${p.player.shortName || p.player.firstName} <b style="color:${window.getStatColor(p.pOvr)}">(${p.slot})</b></span>`;
+                  const formatPlayer = p => `<span style="white-space:nowrap;">${p.player.shortName || p.player.firstName} <b style="color:${getStatColor(p.pOvr)}">(${p.slot})</b></span>`;
                   const aNames = data.lineupA.lineup.map(formatPlayer).join(', ');
                   const bNames = data.lineupB.lineup.map(formatPlayer).join(', ');
                   
@@ -1239,35 +1510,8 @@ function runSimulation(e) {
 
           output.innerHTML = html;
 
-          for(let index = 0; index < Math.min(5, validSquads.length); index++) {
-              const data = validSquads[index];
-              const trueStatsA = data.lineupA.stats;
-              const trueStatsB = data.lineupB.stats;
-              
-              new Chart(document.getElementById(`teamChart-${index}`).getContext('2d'), { 
-                  type: 'radar', 
-                  data: { 
-                      labels: ['Hava', 'Pas D.', 'Sav', 'Şut', 'Dribling', 'Fırsat Y.'], 
-                      datasets: [
-                          { label: 'A Takımı', data: [trueStatsA.hava, trueStatsA.pas, trueStatsA.savunma, trueStatsA.sut, trueStatsA.dribling, trueStatsA.firsat], backgroundColor: 'rgba(52, 152, 219, 0.25)', borderColor: '#3498db', borderWidth: 2, pointBackgroundColor: '#3498db', pointRadius: 2 }, 
-                          { label: 'B Takımı', data: [trueStatsB.hava, trueStatsB.pas, trueStatsB.savunma, trueStatsB.sut, trueStatsB.dribling, trueStatsB.firsat], backgroundColor: 'rgba(231, 76, 60, 0.25)', borderColor: '#e74c3c', borderWidth: 2, pointBackgroundColor: '#e74c3c', pointRadius: 2 }
-                      ] 
-                  }, 
-                  options: { 
-                      layout: { padding: 25 }, 
-                      maintainAspectRatio: false, 
-                      scales: { 
-                          r: { 
-                              min: 0, 
-                              ticks: { display: false }, 
-                              grid: { color: 'rgba(127, 140, 141, 0.2)' }, 
-                              angleLines: { color: 'rgba(127, 140, 141, 0.2)' }, 
-                              pointLabels: { color: '#7f8c8d', font: { size: 12, weight: 'bold' } } 
-                          } 
-                      }, 
-                      plugins: { legend: { display: false } } 
-                  } 
-              });
+          for(let index = 0; index < simResults.length; index++) {
+              renderSimCard(index);
           }
           
         } catch (err) { output.innerHTML = `<span style="background:#c0392b; color:white; padding:10px; border-radius:4px; display:block;">❌ HATA: ${err.message}</span>`; }
@@ -1276,10 +1520,9 @@ function runSimulation(e) {
 
 function renderRadarChart(playerId) {
     if (chartInstances[playerId]) return; 
-    const player = currentPlayers.find(p => p.id === playerId); if(!player) return;
+    const player = currentPlayers.find(p => String(p.id) === String(playerId)); if(!player) return;
     const canvas = document.getElementById(`chart-${playerId}`); if(!canvas) return;
     
-    // Etkili (Aktif) rolün GK olup olmadığını kontrol ediyoruz
     const eff = getEffectivePlayerInfo(player, false);
     const isActiveGK = getBasePosition(eff.active) === 'GK';
 
@@ -1311,11 +1554,11 @@ function renderRadarChart(playerId) {
 }
 
 function editPlayer(id) {
-    const player = currentPlayers.find(p => p.id === id); if (!player) return;
+    const player = currentPlayers.find(p => String(p.id) === String(id)); if (!player) return;
     
     const clonedSecPositions = JSON.parse(JSON.stringify(player.secondaryPositions || []));
     
-    editingPlayerId = id;
+    editingPlayerId = player.id; 
     const safeSet = (elemId, val) => { const el = document.getElementById(elemId); if (el) el.value = val; };
     safeSet('pName', player.firstName || player.name.split(' ')[0]);
     safeSet('pLastName', player.lastName || player.name.split(' ').slice(1).join(' ').replace(' 🧪', ''));
@@ -1325,7 +1568,7 @@ function editPlayer(id) {
     renderPositionMap(); 
     
     const mainRoleSelect = document.querySelector('.pos-btn-group.main-pos .role-select');
-    if (mainRoleSelect && player.role) {
+    if (mainRoleSelect && player.role && player.role !== 'null') {
         mainRoleSelect.value = player.role;
         mainRoleSelect.parentElement.dataset.manual = 'true';
     }
@@ -1336,7 +1579,7 @@ function editPlayer(id) {
         if (btnGroup) { 
             btnGroup.classList.add('active-sec');
             const capInput = btnGroup.querySelector('.cap-input'); if (capInput) capInput.value = sec.capacity; 
-            const sel = btnGroup.querySelector('.role-select'); if (sel) { sel.style.display = 'block'; sel.value = sec.role; btnGroup.dataset.manual = 'true'; }
+            const sel = btnGroup.querySelector('.role-select'); if (sel) { sel.style.display = 'block'; sel.value = (sec.role === 'null') ? '' : sec.role; btnGroup.dataset.manual = 'true'; }
             const secControls = btnGroup.querySelector('.sec-controls'); if (secControls) secControls.style.display = 'flex';
         }
       });
@@ -1359,7 +1602,6 @@ function cancelEdit(e) {
     
     const safeSet = (elemId, val) => { const el = document.getElementById(elemId); if (el) el.value = val; };
     
-    // Formu varsayılan değerlerine sıfırla
     safeSet('pName', "");
     safeSet('pLastName', "");
     safeSet('pShortName', "");
@@ -1373,19 +1615,16 @@ function cancelEdit(e) {
     safeSet('sHava', 40);
     safeSet('sSutKar', 0);
 
-    // Yan mevkileri ve manuel rol seçimlerini temizle
     document.querySelectorAll('.pos-btn-group.active-sec').forEach(btn => btn.classList.remove('active-sec'));
     const mainGroup = document.querySelector(`.pos-btn-group.main-pos`);
     if (mainGroup) delete mainGroup.dataset.manual;
 
-    // Butonları eski haline getir
     const btn = document.getElementById('btnAddPlayer'); 
     if(btn) { btn.innerText = "Oyuncuyu Havuza Ekle"; btn.className = "btn btn-green"; }
     
     const btnCancel = document.getElementById('btnCancelEdit');
     if(btnCancel) btnCancel.style.display = 'none';
 
-    // Arayüzü tazele
     renderPositionMap(); 
     updateLiveRoles();
     updateCondPreview();

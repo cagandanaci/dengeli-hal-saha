@@ -5,6 +5,23 @@ const SLOT_NAMES = ["GK", "CB", "LCB", "RCB", "LB", "RB", "DM", "LDM", "RDM", "L
 const SLOT_IDX = {};
 SLOT_NAMES.forEach((s, i) => SLOT_IDX[s] = i);
 
+const POS_COORDS = {
+    "GK": [2, 4], "CB": [2, 4], "LCB": [1, 4], "RCB": [3, 4], "LB": [0, 4], "RB": [4, 4],
+    "DM": [2, 3], "LDM": [1, 3], "RDM": [3, 3], "LWB": [0, 3], "RWB": [4, 3],
+    "CM": [2, 2], "LCM": [1, 2], "RCM": [3, 2], "LM": [0, 2], "RM": [4, 2],
+    "AM": [2, 1], "LAM": [1, 1], "RAM": [3, 1], "LW": [0, 1], "RW": [4, 1],
+    "FW": [2, 0], "LFW": [1, 0], "RFW": [3, 0]
+};
+
+// 🔥 SENİN ÇİZDİĞİN 5x5 İHTİYAÇ MATRİSİ 🔥
+const GRID_NEEDS = [
+    [0, 15, 30, 15, 0],   // Y=0 (Hücum - FW Hattı)
+    [0, 20, 35, 20, 0], // Y=1 (AM Hattı)
+    [0, 25, 40, 25, 0], // Y=2 (CM Hattı)
+    [5, 30, 50, 30, 5], // Y=3 (DM Hattı)
+    [10, 30, 55, 30, 10]  // Y=4 (Savunma - CB Hattı)
+];
+
 function getBasePosition(slot) {
   const map = {
       "LCB": "CB", "RCB": "CB", "LCM": "CM", "RCM": "CM", "LDM": "DM", "RDM": "DM", "LAM": "AM", "RAM": "AM", "LFW": "FW", "RFW": "FW"
@@ -12,21 +29,49 @@ function getBasePosition(slot) {
   return map[slot] || slot;
 }
 
+// 🛡️ NULL HATASINI KÖKTEN ÇÖZEN YEREL ROL BULUCU
+function getBestRoleForStatsLocal(pos, stats) {
+    const roles = ROLE_WEIGHTS[pos];
+    if (!roles) return "Bilinmeyen Rol";
+    let bestRole = Object.keys(roles)[0];
+    let maxAverage = -1;
+    for (const [roleName, weights] of Object.entries(roles)) {
+        let totalScore = 0, totalWeight = 0;
+        for (const [statName, weightVal] of Object.entries(weights)) {
+            if (weightVal > 0) {
+                totalScore += (stats[statName] || 0) * weightVal;
+                totalWeight += weightVal;
+            }
+        }
+        const avg = totalWeight > 0 ? (totalScore / totalWeight) : 0;
+        if (avg > maxAverage) { maxAverage = avg; bestRole = roleName; }
+    }
+    return bestRole;
+}
+
 function getPlayerCapacityForSlot(player, slot, forceFill) {
     const baseSlot = getBasePosition(slot);
     
     if (player.bannedPositions && player.bannedPositions.includes(baseSlot)) {
-        return { cap: 0, isMain: false, isSec: false, outOfPos: true, invalid: true, banned: true, role: null };
+        return { cap: 0, isMain: false, isSec: false, outOfPos: true, invalid: true, banned: true, role: getBestRoleForStatsLocal(baseSlot, player.stats) };
     }
 
     const mainBase = getBasePosition(player.mainPos);
-    if (mainBase === baseSlot) return { cap: 100, isMain: true, isSec: false, outOfPos: false, invalid: false, banned: false, role: player.role };
+    if (mainBase === baseSlot) {
+        let r = player.role;
+        if (!r || r === 'null') r = getBestRoleForStatsLocal(baseSlot, player.stats);
+        return { cap: 100, isMain: true, isSec: false, outOfPos: false, invalid: false, banned: false, role: r };
+    }
     
     const sec = player.secondaryPositions?.find(sp => getBasePosition(sp.pos) === baseSlot);
-    if (sec) return { cap: Math.max(25, sec.capacity), isMain: false, isSec: true, outOfPos: false, invalid: false, banned: false, role: sec.role };
+    if (sec) {
+        let r = sec.role;
+        if (!r || r === 'null') r = getBestRoleForStatsLocal(baseSlot, player.stats);
+        return { cap: Math.max(25, sec.capacity), isMain: false, isSec: true, outOfPos: false, invalid: false, banned: false, role: r };
+    }
     
-    if (forceFill) return { cap: 25, isMain: false, isSec: false, outOfPos: true, invalid: false, banned: false, role: null };
-    return { cap: 0, isMain: false, isSec: false, outOfPos: true, invalid: true, banned: false, role: null };
+    if (forceFill) return { cap: 25, isMain: false, isSec: false, outOfPos: true, invalid: false, banned: false, role: getBestRoleForStatsLocal(baseSlot, player.stats) };
+    return { cap: 0, isMain: false, isSec: false, outOfPos: true, invalid: true, banned: false, role: getBestRoleForStatsLocal(baseSlot, player.stats) };
 }
 
 function calculateRoleOVR(player, pos, role) {
@@ -41,6 +86,63 @@ function calculateRoleOVR(player, pos, role) {
         baseOvr = Math.round(((player.stats.pas || 0) + (player.stats.savunma || 0) + (player.stats.dribling || 0) + (player.stats.hava || 0) + getStat('firsat') + (pos === 'GK' ? player.stats.sutKarsilama || 0 : getStat('sut'))) / 6);
     }
     return baseOvr;
+}
+
+function isAttackerRole(basePos, role) {
+    if (['FW', 'AM', 'LW', 'RW'].includes(basePos)) return true;
+    if (['LM', 'RM'].includes(basePos) && ['Ofansif Açık Orta Saha', 'Ters Ofansif Açık Orta Saha'].includes(role)) return true;
+    if (basePos === 'CM' && ['Hücumcu Orta Saha', 'Şutör Orta Saha'].includes(role)) return true;
+    if (basePos === 'DM' && role === 'Hücumcu Defansif Orta Saha') return true;
+    if (['LWB', 'RWB'].includes(basePos) && role === 'Ofansif Kanat Bek') return true;
+    return false;
+}
+
+function calculateGridPenalty(assignment) {
+    const coverage = Array.from({length: 5}, () => new Array(5).fill(0));
+
+    assignment.forEach(item => {
+        if (item.invalid || item.basePos === "GK") return; 
+
+        const coords = POS_COORDS[item.slot];
+        if (!coords) return;
+        
+        const cx = coords[0];
+        const cy = coords[1];
+
+        const isAtk = isAttackerRole(item.basePos, item.role);
+        const multiplier = isAtk ? 0.6 : 1.0;
+
+        for (let y = 0; y < 5; y++) {
+            for (let x = 0; x < 5; x++) {
+                const dx = Math.abs(x - cx);
+                const dy = Math.abs(y - cy);
+                let val = 0;
+
+                if (dx === 0 && dy === 0) val = 60; 
+                else if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) val = 30; 
+                else if (dx === 1 && dy === 1) val = 15; 
+
+                coverage[y][x] += val * multiplier;
+            }
+        }
+    });
+
+    let penalty = 0;
+    for (let y = 0; y < 5; y++) {
+        for (let x = 0; x < 5; x++) {
+            const deficit = GRID_NEEDS[y][x] - coverage[y][x];
+            if (deficit > 0) {
+                // Bölgeye özel önem çarpanı (Savunma ve Ön Libero hattını boş bırakmayı ağır cezalandırır)
+                let rowMultiplier = 1.0;
+                if (y === 3) rowMultiplier = 2.0; // DM hattı (x2 Ceza)
+                if (y === 4) rowMultiplier = 3.5; // Savunma hattı (x3.5 Ceza)
+                
+                // Ana formül: (Açık - Tolerans)^2.8 * 8 * Bölge Çarpanı
+                penalty += Math.pow(Math.max(0, deficit - 5), 2.8) * 8 * rowMultiplier;
+            }
+        }
+    }
+    return penalty;
 }
 
 let PRE_COST = [];
@@ -149,52 +251,6 @@ function solveAssignment(teamPlayers, slots, forceFill) {
     return assignment;
 }
 
-const POS_COORDS = {
-    "GK": [2, 4], "CB": [2, 4], "LCB": [1, 4], "RCB": [3, 4], "LB": [0, 4], "RB": [4, 4],
-    "DM": [2, 3], "LDM": [1, 3], "RDM": [3, 3], "LWB": [0, 3], "RWB": [4, 3],
-    "CM": [2, 2], "LCM": [1, 2], "RCM": [3, 2], "LM": [0, 2], "RM": [4, 2],
-    "AM": [2, 1], "LAM": [1, 1], "RAM": [3, 1], "LW": [0, 1], "RW": [4, 1],
-    "FW": [2, 0], "LFW": [1, 0], "RFW": [3, 0]
-};
-
-// Taktiksel Boşluk (Grid) Motoru
-function getGridSpacePenalty(slots) {
-    let penalty = 0;
-    let leftCount = 0, rightCount = 0, centerCount = 0;
-    let defLeft = 0, defRight = 0, defCenter = 0;
-
-    slots.forEach(slot => {
-        if (slot === "GK") return;
-        const c = POS_COORDS[slot];
-        if (!c) return;
-
-        // Genel genişlik analizi
-        if (c[0] < 2) leftCount++;
-        else if (c[0] > 2) rightCount++;
-        else centerCount++;
-
-        // SAVUNMA HATTI (Y ekseni 3 ve 4: CB'ler, Bekler ve DM'ler)
-        if (c[1] >= 3) { 
-            if (c[0] < 2) defLeft++;
-            else if (c[0] > 2) defRight++;
-            else defCenter++;
-        }
-    });
-
-    if (leftCount === 0 || rightCount === 0) penalty += 20000;
-    if (centerCount > 3) penalty += Math.pow((centerCount - 3), 3) * 5000;
-
-    if (defCenter >= 2 && defLeft === 0 && defRight === 0) {
-        penalty += 40000; 
-    } else if (defCenter >= 1 && defLeft === 0 && defRight === 0) {
-        penalty += 15000; 
-    } else if (defCenter >= 2 && (defLeft < 1 || defRight < 1)) {
-        penalty += 10000; 
-    }
-
-    return penalty;
-}
-
 export function getPerfectLineups(teamPlayers, format, forceFill = false) {
   const availableFormations = FORMATIONS.filter(f => f.format === format);
   const lineups = [];
@@ -219,7 +275,8 @@ export function getPerfectLineups(teamPlayers, format, forceFill = false) {
           if (bannedCount > 0) return; 
           if (!forceFill && invalidCount > 0) return; 
 
-          const gridPenalty = getGridSpacePenalty(variant.slots);
+          // Yeni Taktiksel Açık / Grid Cezası
+          const gridPenalty = calculateGridPenalty(assignment);
 
           lineups.push({
               formationName: formation.name,

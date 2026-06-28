@@ -6,7 +6,7 @@ export const CONDITIONS = {
   'Kötü': 0.4
 };
 
-// Mevki ve Rollere Göre CIES Kriter Ağırlıkları (%)
+// Mevki ve Rollere Göre Ağırlıkları (%)
 export const ROLE_WEIGHTS = {
   "GK": {
     "Kaleci": {
@@ -139,10 +139,10 @@ export const ROLE_WEIGHTS = {
     },
     "Derin Oyun Kurucu": {
       "pas": 35,
-      "savunma": 35,
+      "savunma": 30,
       "hava": 5,
       "dribling": 10,
-      "sut": 0,
+      "sut": 5,
       "firsat": 15
     },
     "Ön Libero": {
@@ -153,11 +153,19 @@ export const ROLE_WEIGHTS = {
       "sut": 0,
       "firsat": 0
     },
-    "Hücumcu Defansif Orta Saha": {
+    "Pasör Ön Libero": {
+      "pas": 30,
+      "savunma": 45,
+      "hava": 10,
+      "dribling": 10,
+      "sut": 0,
+      "firsat": 5
+    },
+    "Hücumcu Defansif Orta Saha": { // (Segundo Volante)
       "pas": 20,
-      "savunma": 25,
+      "savunma": 15,
       "hava": 5,
-      "dribling": 20,
+      "dribling": 30,
       "sut": 20,
       "firsat": 10
     }
@@ -203,13 +211,13 @@ export const ROLE_WEIGHTS = {
       "sut": 10,
       "firsat": 15
     },
-    "Hücumcu Orta Saha": {
-      "pas": 15,
+    "Hücumcu Orta Saha": { // (Mezzela)
+      "pas": 20,
       "savunma": 5,
       "hava": 0,
       "dribling": 30,
       "sut": 25,
-      "firsat": 25
+      "firsat": 20
     }
   },
   "AM": {
@@ -265,11 +273,19 @@ export const ROLE_WEIGHTS = {
     },
     "Ofansif Açık Orta Saha": {
       "pas": 15,
-      "savunma": 10,
+      "savunma": 15,
       "hava": 0,
-      "dribling": 35,
+      "dribling": 30,
       "sut": 15,
       "firsat": 25
+    },
+    "Ters Ofansif Açık Orta Saha": {
+      "pas": 15,
+      "savunma": 15,
+      "hava": 0,
+      "dribling": 25,
+      "sut": 25,
+      "firsat": 20
     },
     "Açık Oyun Kurucu": {
       "pas": 30,
@@ -435,11 +451,19 @@ export const ROLE_WEIGHTS = {
     },
     "Ofansif Açık Orta Saha": {
       "pas": 15,
-      "savunma": 10,
+      "savunma": 15,
       "hava": 0,
-      "dribling": 35,
+      "dribling": 30,
       "sut": 15,
       "firsat": 25
+    },
+    "Ters Ofansif Açık Orta Saha": {
+      "pas": 15,
+      "savunma": 15,
+      "hava": 0,
+      "dribling": 25,
+      "sut": 25,
+      "firsat": 20
     },
     "Açık Oyun Kurucu": {
       "pas": 30,
