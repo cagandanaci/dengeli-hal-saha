@@ -300,40 +300,56 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         document.head.appendChild(ds);
     }
-    if (!document.getElementById('mobile-fix-styles')) {
+    
+    // YENİ VE DAHA ESNEK MOBİL DÜZELTME
+    if (!document.getElementById('mobile-responsive-styles')) {
         const ms = document.createElement('style');
-        ms.id = 'mobile-fix-styles';
+        ms.id = 'mobile-responsive-styles';
         ms.innerHTML = `
-            .settings-panel, .settings-panel > div {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 8px;
-            }
-            .settings-panel label, .settings-panel button {
-                flex: 1 1 auto;
-                min-width: 120px;
+            /* Kutu modelini global ve güvenli şekilde ayarla */
+            *, *::before, *::after {
                 box-sizing: border-box;
-                white-space: nowrap;
-                margin: 0 !important;
             }
-            .db-management-container > div {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 8px;
-                width: 100%;
-            }
-            .db-management-container select, .db-management-container button {
-                flex: 1 1 calc(33% - 8px);
-                min-width: 90px;
-                box-sizing: border-box;
-                margin: 0 !important;
+
+            @media (max-width: 900px) {
+                /* Sol ve Sağ panel içindeki buton gruplarını mobilde alt alta diz */
+                .left-panel .btn-group, .right-panel .btn-group {
+                    flex-direction: column !important;
+                }
+                .left-panel .btn-group .btn, .right-panel .btn-group .btn {
+                    width: 100% !important;
+                    margin-left: 0 !important;
+                    margin-right: 0 !important;
+                }
+
+                /* Ayarlar barını ve içindeki ögeleri mobilde düzenle */
+                .settings-bar {
+                    flex-direction: column !important;
+                    align-items: stretch !important;
+                }
+                .setting-lbl {
+                    width: 100% !important;
+                    justify-content: center !important;
+                }
+                .settings-bar button {
+                    width: 100% !important;
+                }
+
+                /* Veritabanı yönetim menüsündeki taşmaları engelle */
+                .db-container > div[style*="display: flex"] {
+                    flex-direction: column !important;
+                    align-items: stretch !important;
+                }
+                #dbSelect {
+                    width: 100% !important;
+                }
             }
         `;
         document.head.appendChild(ms);
     }
 
     const livePitchWrap = document.getElementById('livePitchWrap');
-    if (livePitchWrap) livePitchWrap.style.display = 'none'; 
+    if (livePitchWrap) livePitchWrap.style.display = 'none';
 
     const savedSettings = JSON.parse(localStorage.getItem('app_settings')) || { darkMode: false, hideOvr: false, lowHava: true, teamColors: false };
     
@@ -390,9 +406,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     cbTeamColors?.addEventListener('change', () => {
         saveSettings();
-        const currentSimBtn = document.getElementById('btnRunSim');
-        if (currentSimBtn && document.querySelector('.sim-result-card')) {
-            currentSimBtn.click(); 
+        // Algoritmayı baştan çalıştırmak yerine sadece ekrandaki mevcut kartları yeniden çizdir
+        if (simResults.length > 0 && document.querySelector('.sim-result-card')) {
+            for (let i = 0; i < simResults.length; i++) {
+                renderSimCard(i);
+            }
         }
     });
 
