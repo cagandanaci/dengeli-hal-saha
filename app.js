@@ -300,16 +300,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const simPitchFixStyles = document.createElement('style');
         simPitchFixStyles.id = 'sim-pitch-fix';
         simPitchFixStyles.innerHTML = `
-            /* Saha yatay eksende genişletildi (En-boy oranı kareye çok daha yakın) */
             .pitch-inner {
                 aspect-ratio: 1 / 1.15 !important; 
                 min-height: 550px !important; 
             }
-            /* Mobilde de aynı şekilde genişlik artırıldı */
+            /* SADECE MOBİL: Saha dikeyde büyütüldü, oyunculara bolca yer açıldı */
             @media (max-width: 900px) {
                 .pitch-inner {
-                    aspect-ratio: 1 / 1.25 !important; 
-                    min-height: 550px !important;
+                    aspect-ratio: 1 / 1.35 !important; 
+                    min-height: 650px !important; 
                 }
             }
         `;
@@ -1049,14 +1048,14 @@ function generateTacticalPitchHTML(lineupData, interfaceTitle, specifiedTeamColo
     if (!lineupData) return '';
     
     const configurationUsesTeamColors = document.getElementById('cbTeamColors')?.checked;
-    
+
     const targetSlotCoordinates = { 
-        "LFW": {x: 20, y: 8}, "FW": {x: 50, y: 8}, "RFW": {x: 80, y: 8}, 
-        "LW": {x: 10, y: 24}, "LAM": {x: 30, y: 24}, "AM": {x: 50, y: 24}, "RAM": {x: 70, y: 24}, "RW": {x: 90, y: 24}, 
-        "LM": {x: 10, y: 40}, "LCM": {x: 30, y: 40}, "CM": {x: 50, y: 40}, "RCM": {x: 70, y: 40}, "RM": {x: 90, y: 40}, 
-        "LWB": {x: 10, y: 56}, "LDM": {x: 30, y: 56}, "DM": {x: 50, y: 56}, "RDM": {x: 70, y: 56}, "RWB": {x: 90, y: 56}, 
-        "LB": {x: 10, y: 72}, "LCB": {x: 30, y: 72}, "CB": {x: 50, y: 72}, "RCB": {x: 70, y: 72}, "RB": {x: 90, y: 72}, 
-        "GK": {x: 50, y: 88} 
+        "LFW": {x: 20, y: 10}, "FW": {x: 50, y: 10}, "RFW": {x: 80, y: 10}, 
+        "LW": {x: 10, y: 26}, "LAM": {x: 30, y: 26}, "AM": {x: 50, y: 26}, "RAM": {x: 70, y: 26}, "RW": {x: 90, y: 26}, 
+        "LM": {x: 10, y: 42}, "LCM": {x: 30, y: 42}, "CM": {x: 50, y: 42}, "RCM": {x: 70, y: 42}, "RM": {x: 90, y: 42}, 
+        "LWB": {x: 10, y: 58}, "LDM": {x: 30, y: 58}, "DM": {x: 50, y: 58}, "RDM": {x: 70, y: 58}, "RWB": {x: 90, y: 58}, 
+        "LB": {x: 10, y: 74}, "LCB": {x: 30, y: 74}, "CB": {x: 50, y: 74}, "RCB": {x: 70, y: 74}, "RB": {x: 90, y: 74}, 
+        "GK": {x: 50, y: 90} 
     };
     
     let constructedPlayersHTML = '';
@@ -1404,16 +1403,53 @@ function handlePlayerAdditionProcess(eventParam) {
 }
 
 function updatePlayerList() {
-    const listElementNodeContainer = document.getElementById('playerListEl'); if (!listElementNodeContainer) return;
+    const listElementNodeContainer = document.getElementById('playerListEl'); 
+    if (!listElementNodeContainer) return;
     chartInstances = {};
     
+    // Görsel düzenlemeler için gerekli CSS sınıfları (Fonksiyon çalıştığında otomatik eklenir)
+    if (!document.getElementById('custom-layout-fixes')) {
+        const styleFix = document.createElement('style');
+        styleFix.id = 'custom-layout-fixes';
+        styleFix.innerHTML = `
+            .unselected-player-text {
+                text-decoration: line-through;
+                opacity: 0.5;
+                filter: grayscale(100%);
+            }
+            .unselected-player-text * {
+                text-decoration: line-through !important;
+            }
+            .visuals-container {
+                display: flex;
+                flex-direction: row;
+                justify-content: space-around;
+                align-items: center;
+                margin-top: 15px;
+                gap: 15px;
+            }
+            .visuals-container > div {
+                flex: 1;
+                max-width: 48%;
+            }
+            @media (max-width: 600px) {
+                .visuals-container { gap: 8px; }
+            }
+        `;
+        document.head.appendChild(styleFix);
+    }
+
     const trackedOpenStatesDict = {};
     document.querySelectorAll('details.player-item, details.category-item').forEach(detNodeReference => { if (detNodeReference.open) trackedOpenStatesDict[detNodeReference.id] = true; });
 
     const formatConfigurationScale = Number(document.getElementById('matchFormat')?.value || 7);
-    const calculatedRequirementThreshold = formatConfigurationScale * 2; const activeSelectedPlayerCount = currentPlayers.filter(p => p.selected).length;
+    const calculatedRequirementThreshold = formatConfigurationScale * 2; 
+    const activeSelectedPlayerCount = currentPlayers.filter(p => p.selected).length;
     const trackerStatusIndicatorNode = document.getElementById('selectionStatus');
-    if (trackerStatusIndicatorNode) { trackerStatusIndicatorNode.innerText = `Seçili: ${activeSelectedPlayerCount} / ${calculatedRequirementThreshold}`; trackerStatusIndicatorNode.style.color = activeSelectedPlayerCount === calculatedRequirementThreshold ? "#a8e63d" : "#e74c3c"; }
+    if (trackerStatusIndicatorNode) { 
+        trackerStatusIndicatorNode.innerText = `Seçili: ${activeSelectedPlayerCount} / ${calculatedRequirementThreshold}`; 
+        trackerStatusIndicatorNode.style.color = activeSelectedPlayerCount === calculatedRequirementThreshold ? "#a8e63d" : "#e74c3c"; 
+    }
 
     let outputHtmlConstructionBuffer = "";
     const positionalCategoriesStructure = [ 
@@ -1461,8 +1497,14 @@ function updatePlayerList() {
                   </div>
                 `;
 
+                const activeBannedList = renderingPlayerInstance.bannedPositions || [];
                 const optionalSecondaryPosBadgesHtml = renderingPlayerInstance.secondaryPositions.length > 0 
-                    ? renderingPlayerInstance.secondaryPositions.map(spMapping => `<span class="badge" style="background:${getStatColor(spMapping.capacity === 100 ? 85 : (spMapping.capacity>50?65:30))};">${spMapping.pos} (%${spMapping.capacity})</span>`).join('') 
+                    ? renderingPlayerInstance.secondaryPositions.map(spMapping => {
+                        const isBanned = activeBannedList.includes(spMapping.pos) || activeBannedList.includes(getBasePosition(spMapping.pos));
+                        const bgColor = isBanned ? '#7f8c8d' : getStatColor(spMapping.capacity === 100 ? 85 : (spMapping.capacity > 50 ? 65 : 30));
+                        const textDeco = isBanned ? 'text-decoration: line-through; opacity: 0.6;' : '';
+                        return `<span style="background:${bgColor}; color:white; padding:3px 6px; border-radius:4px; font-size:0.85em; font-weight:bold; margin-right:4px; display:inline-block; margin-bottom:4px; ${textDeco}">${spMapping.pos} (%${spMapping.capacity})</span>`;
+                    }).join('') 
                     : '<span style="font-size:0.85em; color:var(--text-muted);">Yok</span>';
 
                 let dynamicOvrBadgeConstruction = `${calculatedEffectiveBaseInfo.ovr} OVR`;
@@ -1474,8 +1516,8 @@ function updatePlayerList() {
                 <details class="player-item" id="details-${renderingPlayerInstance.id}" style="margin-bottom: 8px;">
                   <summary class="player-summary">
                     <div style="display: flex; align-items: center; gap: 10px;">
-                      <input type="checkbox" class="player-select-cb" data-id="${renderingPlayerInstance.id}" ${renderingPlayerInstance.selected ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer;">
-                      <span style="${renderingPlayerInstance.selected ? '' : 'text-decoration:line-through; opacity:0.5;'}">
+                      <input type="checkbox" class="player-select-cb" data-id="${renderingPlayerInstance.id}" ${renderingPlayerInstance.selected ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer; flex-shrink: 0;">
+                      <span class="${renderingPlayerInstance.selected ? '' : 'unselected-player-text'}" style="flex: 1;">
                         <b style="color:${calculatedNameRenderingColor};">${renderingPlayerInstance.name}</b>${shortNameDisplayHtmlFragment} <span class="cond-icon">${conditionSvgCodeComponent}</span> <span class="pitch-ovr-text" style="background:${getStatColor(calculatedEffectiveBaseInfo.ovr)}; color:white; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding:2px 6px; border-radius:4px; font-size:0.8em; margin-left:4px; white-space:nowrap; display:inline-block;">${dynamicOvrBadgeConstruction}</span> | ${visualPositionDisplayConfig} ${visualRoleDisplayConfig}
                       </span>
                     </div>
@@ -1484,17 +1526,21 @@ function updatePlayerList() {
                   <div class="player-details-row">
                     <div class="pd-col-stats">
                         ${tabularStatsHtmlOutput}
-                        <div style="position:relative; width:100%; max-width: 220px; aspect-ratio: 1/1; margin: 10px auto 0 auto; display: flex; justify-content: center;">
+                    </div>
+                    
+                    <div class="visuals-container">
+                        <div style="position:relative; aspect-ratio: 1/1;">
                             <canvas id="chart-${renderingPlayerInstance.id}"></canvas>
                         </div>
-                    </div>
-                    <div class="pd-col-pitch">
-                        <span style="font-size:0.85em; font-weight:bold; color:var(--text-muted); text-align:center;">Mevki Haritası<br><span style="font-size:0.8em; color:#e74c3c;">(Tıklayarak yasakla)</span></span>
-                        <div style="background: var(--pitch-bg); border-radius: 4px; padding: 2px;">
-                            ${generateMiniPitchHTML(renderingPlayerInstance, "160px")}
+                        <div>
+                            <span style="font-size:0.85em; font-weight:bold; color:var(--text-muted); text-align:center; display:block; margin-bottom:5px;">📍 Mevki Haritası<br><span style="font-size:0.8em; color:#e74c3c;">(Tıklayarak yasakla)</span></span>
+                            <div style="background: var(--pitch-bg); border-radius: 4px; padding: 2px;">
+                                ${generateMiniPitchHTML(renderingPlayerInstance, "100%")}
+                            </div>
                         </div>
                     </div>
-                    <div class="pd-col-sec">
+                    
+                    <div class="pd-col-sec" style="margin-top: 15px;">
                         <div>
                             <span style="font-size:0.9em; font-weight:bold; display:block; margin-bottom:8px;">Yan Mevkiler:</span>
                             <div class="sec-pos-badges">
@@ -1502,6 +1548,7 @@ function updatePlayerList() {
                             </div>
                         </div>
                     </div>
+                    
                     <div style="flex-basis: 100%; display: flex; gap: 15px; margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 15px; justify-content: flex-start;">
                         <button type="button" class="btn btn-yellow btn-edit" data-id="${renderingPlayerInstance.id}" style="min-width: 120px;">Düzenle</button>
                         <button type="button" class="btn btn-red btn-delete" data-id="${renderingPlayerInstance.id}" style="min-width: 120px;">Sil</button>
@@ -1516,8 +1563,18 @@ function updatePlayerList() {
     listElementNodeContainer.innerHTML = outputHtmlConstructionBuffer;
 
     document.querySelectorAll('details.player-item').forEach(detNode => { if (trackedOpenStatesDict[detNode.id]) detNode.open = true; });
-    document.querySelectorAll('.player-select-cb').forEach(cbNode => { cbNode.addEventListener('change', eventContext => { const contextualPlayerObj = currentPlayers.find(x => String(x.id) === String(eventContext.target.dataset.id)); if (contextualPlayerObj) contextualPlayerObj.selected = eventContext.target.checked; updatePlayerList(); }); });
-    document.querySelectorAll('.player-item').forEach(detNode => { detNode.addEventListener('toggle', () => { if (detNode.open) renderRadarChart(Number(detNode.id.split('-')[1])); }); });
+    document.querySelectorAll('.player-select-cb').forEach(cbNode => { 
+        cbNode.addEventListener('change', eventContext => { 
+            const contextualPlayerObj = currentPlayers.find(x => String(x.id) === String(eventContext.target.dataset.id)); 
+            if (contextualPlayerObj) contextualPlayerObj.selected = eventContext.target.checked; 
+            updatePlayerList(); 
+        }); 
+    });
+    document.querySelectorAll('.player-item').forEach(detNode => { 
+        detNode.addEventListener('toggle', () => { 
+            if (detNode.open) renderRadarChart(Number(detNode.id.split('-')[1])); 
+        }); 
+    });
 }
 
 function renderSimCard(processingCardIndex) {
