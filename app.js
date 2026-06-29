@@ -9,48 +9,48 @@ function getStatColor(val) {
     return '#e74c3c';                
 }
 
-window.addEventListener('error', (e) => {
-    console.error("Sistem Hatası Yakalandı: ", e.message);
+window.addEventListener('error', (event) => {
+    console.error("Sistem Hatası Yakalandı: ", event.message);
 });
 
-function getConditionHeart(cond, size = 22) {
+function getConditionHeart(condition, size = 22) {
     let color, darkColor, percent;
-    if (cond === 'Tam') { color = '#00e676'; darkColor = '#0a381f'; percent = 100; } 
-    else if (cond === 'İyi') { color = '#a8e63d'; darkColor = '#2a3b10'; percent = 80; } 
-    else if (cond === 'Vasat') { color = '#d1b354'; darkColor = '#3b3216'; percent = 40; } 
-    else if (cond === 'Kötü') { color = '#d35400'; darkColor = '#3d1a00'; percent = 20; } 
+    if (condition === 'Tam') { color = '#00e676'; darkColor = '#0a381f'; percent = 100; } 
+    else if (condition === 'İyi') { color = '#a8e63d'; darkColor = '#2a3b10'; percent = 80; } 
+    else if (condition === 'Vasat') { color = '#d1b354'; darkColor = '#3b3216'; percent = 40; } 
+    else if (condition === 'Kötü') { color = '#d35400'; darkColor = '#3d1a00'; percent = 20; } 
     else return '';
 
-    const uid = Math.random().toString(36).substring(2, 9);
+    const uniqueId = Math.random().toString(36).substring(2, 9);
 
-    return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align: middle; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.3));" title="${cond} Kondisyon">
+    return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align: middle; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.3));" title="${condition} Kondisyon">
               <defs>
-                <linearGradient id="grad-${uid}" x1="0" y1="1" x2="0" y2="0">
+                <linearGradient id="grad-${uniqueId}" x1="0" y1="1" x2="0" y2="0">
                   <stop offset="0%" stop-color="${color}" />
                   <stop offset="${percent}%" stop-color="${color}" />
                   <stop offset="${percent}%" stop-color="${darkColor}" />
                   <stop offset="100%" stop-color="${darkColor}" />
                 </linearGradient>
               </defs>
-              <path fill="url(#grad-${uid})" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+              <path fill="url(#grad-${uniqueId})" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
               <polyline points="5.5,11 8.5,11 10.5,6.5 13.5,16 15.5,11 18.5,11" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />
             </svg>`;
 }
 
-const DEFAULT_ROLE_WEIGHTS = JSON.parse(JSON.stringify(ROLE_WEIGHTS));
+const defaultRoleWeights = JSON.parse(JSON.stringify(ROLE_WEIGHTS));
 try {
-    const stored = localStorage.getItem('custom_role_weights');
-    if (stored) {
-        const parsed = JSON.parse(stored);
-        for(let pos in parsed) {
+    const storedWeights = localStorage.getItem('custom_role_weights');
+    if (storedWeights) {
+        const parsedWeights = JSON.parse(storedWeights);
+        for(let pos in parsedWeights) {
             if(ROLE_WEIGHTS[pos]) {
-                for(let role in parsed[pos]) {
-                    ROLE_WEIGHTS[pos][role] = parsed[pos][role];
+                for(let role in parsedWeights[pos]) {
+                    ROLE_WEIGHTS[pos][role] = parsedWeights[pos][role];
                 }
             }
         }
     }
-} catch(e) {}
+} catch(err) {}
 
 function saveRoleWeights() {
     localStorage.setItem('custom_role_weights', JSON.stringify(ROLE_WEIGHTS));
@@ -58,9 +58,9 @@ function saveRoleWeights() {
 
 function resetRoleWeights() {
     localStorage.removeItem('custom_role_weights');
-    for(let pos in DEFAULT_ROLE_WEIGHTS) {
-        for(let role in DEFAULT_ROLE_WEIGHTS[pos]) {
-            ROLE_WEIGHTS[pos][role] = DEFAULT_ROLE_WEIGHTS[pos][role];
+    for(let pos in defaultRoleWeights) {
+        for(let role in defaultRoleWeights[pos]) {
+            ROLE_WEIGHTS[pos][role] = defaultRoleWeights[pos][role];
         }
     }
 }
@@ -74,251 +74,271 @@ let simCharts = {};
 const ALL_POSITIONS = ["GK", "CB", "LB", "RB", "LWB", "RWB", "DM", "CM", "AM", "LM", "RM", "LW", "RW", "FW"];
 
 function getBasePosition(slot) {
-  const map = { "LCB": "CB", "RCB": "CB", "LCM": "CM", "RCM": "CM", "LDM": "DM", "RDM": "DM", "LAM": "AM", "RAM": "AM", "LFW": "FW", "RFW": "FW" };
-  return map[slot] || slot;
+  const positionMap = { "LCB": "CB", "RCB": "CB", "LCM": "CM", "RCM": "CM", "LDM": "DM", "RDM": "DM", "LAM": "AM", "RAM": "AM", "LFW": "FW", "RFW": "FW" };
+  return positionMap[slot] || slot;
 }
 
 function updateCondPreview() {
-    const pCondEl = document.getElementById('pCond');
-    const previewEl = document.getElementById('condIconPreview');
-    if (pCondEl && previewEl) {
-        previewEl.innerHTML = getConditionHeart(pCondEl.value, 22);
+    const pCondElement = document.getElementById('pCond');
+    const previewElement = document.getElementById('condIconPreview');
+    if (pCondElement && previewElement) {
+        previewElement.innerHTML = getConditionHeart(pCondElement.value, 22);
     }
 }
 
 function updateFormationName(lineupObj) {
-    let counts = { D: 0, DM: 0, M: 0, AM: 0, F: 0 };
+    let positionalCounts = { D: 0, DM: 0, M: 0, AM: 0, F: 0 };
     lineupObj.lineup.forEach(item => {
         if (item.slot === 'GK') return;
-        const b = item.basePos;
-        if (['CB','LB','RB','LWB','RWB'].includes(b)) counts.D++;
-        else if (['DM'].includes(b)) counts.DM++;
-        else if (['CM','LM','RM'].includes(b)) counts.M++;
-        else if (['AM'].includes(b)) counts.AM++;
-        else if (['FW','LW','RW'].includes(b)) counts.F++;
+        const basePosition = item.basePos;
+        if (['CB','LB','RB','LWB','RWB'].includes(basePosition)) positionalCounts.D++;
+        else if (['DM'].includes(basePosition)) positionalCounts.DM++;
+        else if (['CM','LM','RM'].includes(basePosition)) positionalCounts.M++;
+        else if (['AM'].includes(basePosition)) positionalCounts.AM++;
+        else if (['FW','LW','RW'].includes(basePosition)) positionalCounts.F++;
     });
-    const parts = [];
-    if(counts.D > 0) parts.push(counts.D);
-    if(counts.DM > 0) parts.push(counts.DM);
-    if(counts.M > 0) parts.push(counts.M);
-    if(counts.AM > 0) parts.push(counts.AM);
-    if(counts.F > 0) parts.push(counts.F);
-    lineupObj.formationName = parts.join('-');
+    const namingParts = [];
+    if(positionalCounts.D > 0) namingParts.push(positionalCounts.D);
+    if(positionalCounts.DM > 0) namingParts.push(positionalCounts.DM);
+    if(positionalCounts.M > 0) namingParts.push(positionalCounts.M);
+    if(positionalCounts.AM > 0) namingParts.push(positionalCounts.AM);
+    if(positionalCounts.F > 0) namingParts.push(positionalCounts.F);
+    lineupObj.formationName = namingParts.join('-');
 }
 
 window.renderStatRow = function(label, normA, normB) {
-    const rA = Math.round(normA);
-    const rB = Math.round(normB);
-    const diff = rA - rB;
+    const roundedA = Math.round(normA);
+    const roundedB = Math.round(normB);
+    const difference = roundedA - roundedB;
     
     let diffColor = 'var(--text-main)';
     let diffText = '0';
     
-    if (diff > 0) { diffColor = '#3498db'; diffText = `+${diff}`; } 
-    else if (diff < 0) { diffColor = '#e74c3c'; diffText = `${diff}`; }
+    if (difference > 0) { diffColor = '#3498db'; diffText = `+${difference}`; } 
+    else if (difference < 0) { diffColor = '#e74c3c'; diffText = `${difference}`; }
     
     return `
         <tr style="border-bottom: 1px dashed var(--border-color);">
             <td style="color: var(--text-muted); text-align: left; padding: 8px;">${label}</td>
-            <td style="color: var(--text-main); font-weight: bold; padding: 8px; font-size:1.1em;">${rA}</td>
-            <td style="color: var(--text-main); font-weight: bold; padding: 8px; font-size:1.1em;">${rB}</td>
+            <td style="color: var(--text-main); font-weight: bold; padding: 8px; font-size:1.1em;">${roundedA}</td>
+            <td style="color: var(--text-main); font-weight: bold; padding: 8px; font-size:1.1em;">${roundedB}</td>
             <td style="color: ${diffColor}; font-weight: bold; padding: 8px;">${diffText}</td>
         </tr>
     `;
 };
 
-window.handlePlayerSwap = function(src, tgt) {
-    const cardIndex = parseInt(src.card);
+window.handlePlayerSwap = function(sourceNode, targetNode) {
+    const cardIndex = parseInt(sourceNode.card);
     if (!simResults[cardIndex]) return;
-    const data = simResults[cardIndex].active;
+    const simData = simResults[cardIndex].active;
 
     const getLineupItem = (teamStr, slotStr) => {
-        const lineup = teamStr === 'A' ? data.lineupA.lineup : data.lineupB.lineup;
-        return lineup.find(i => i.slot === slotStr);
+        const lineup = teamStr === 'A' ? simData.lineupA.lineup : simData.lineupB.lineup;
+        return lineup.find(item => item.slot === slotStr);
     };
 
-    const srcItem = getLineupItem(src.team, src.slot);
-    const tgtItem = getLineupItem(tgt.team, tgt.slot); 
+    const sourceItem = getLineupItem(sourceNode.team, sourceNode.slot);
+    const targetItem = getLineupItem(targetNode.team, targetNode.slot); 
 
-    if (!srcItem) return;
+    if (!sourceItem) return;
 
-    const reEvaluate = (item) => {
-        const p = item.player;
-        const basePos = item.basePos;
-        item.isMain = getBasePosition(p.mainPos) === basePos;
-        const secObj = p.secondaryPositions.find(sp => getBasePosition(sp.pos) === basePos);
-        item.isSec = !!secObj;
+    const reEvaluateItem = (item) => {
+        const playerObj = item.player;
+        const basePosition = item.basePos;
+        item.isMain = getBasePosition(playerObj.mainPos) === basePosition;
+        const secondaryMatch = playerObj.secondaryPositions.find(sp => getBasePosition(sp.pos) === basePosition);
+        item.isSec = !!secondaryMatch;
 
-        item.outOfPos = (p.bannedPositions && p.bannedPositions.includes(basePos)) || (p.bannedPositions && p.bannedPositions.includes(item.slot));
+        item.outOfPos = (playerObj.bannedPositions && playerObj.bannedPositions.includes(basePosition)) || (playerObj.bannedPositions && playerObj.bannedPositions.includes(item.slot));
         if (!item.isMain && !item.isSec) item.outOfPos = true;
 
         if (item.outOfPos) {
             item.cap = 25; 
-            item.role = getBestRoleForStats(basePos, p.stats);
+            item.role = getBestRoleForStats(basePosition, playerObj.stats);
         } else if (item.isMain) {
             item.cap = 100;
-            item.role = (!p.role || p.role === 'null') ? getBestRoleForStats(basePos, p.stats) : p.role;
+            item.role = (!playerObj.role || playerObj.role === 'null') ? getBestRoleForStats(basePosition, playerObj.stats) : playerObj.role;
         } else if (item.isSec) {
-            item.cap = secObj.capacity;
-            item.role = (!secObj.role || secObj.role === 'null') ? getBestRoleForStats(basePos, p.stats) : secObj.role;
+            item.cap = secondaryMatch.capacity;
+            item.role = (!secondaryMatch.role || secondaryMatch.role === 'null') ? getBestRoleForStats(basePosition, playerObj.stats) : secondaryMatch.role;
         }
-        item.pOvr = getOvrForPosition(p, item.slot, item.role, item.cap, false);
+        item.pOvr = getOvrForPosition(playerObj, item.slot, item.role, item.cap, false);
     };
 
-    if (tgtItem) {
-        const tempPlayer = srcItem.player;
-        srcItem.player = tgtItem.player;
-        tgtItem.player = tempPlayer;
+    if (targetItem) {
+        const temporaryPlayer = sourceItem.player;
+        sourceItem.player = targetItem.player;
+        targetItem.player = temporaryPlayer;
 
-        reEvaluate(srcItem);
-        reEvaluate(tgtItem);
+        reEvaluateItem(sourceItem);
+        reEvaluateItem(targetItem);
     } else {
-        if (src.team !== tgt.team) {
-            alert("Sayı eksilmemesi için takım değiştirirken oyuncuyu BOŞ bir mevkiye değil, TAKAS etmek istediğiniz oyuncunun üzerine bırakın.");
+        if (sourceNode.team !== targetNode.team) {
+            alert("Sayı eksilmemesi için takım değiştirirken oyuncuyu boş bir mevkiye değil, takas etmek istediğiniz oyuncunun üzerine bırakın.");
             return;
         }
         
-        srcItem.slot = tgt.slot;
-        srcItem.basePos = getBasePosition(tgt.slot);
-        reEvaluate(srcItem);
+        sourceItem.slot = targetNode.slot;
+        sourceItem.basePos = getBasePosition(targetNode.slot);
+        reEvaluateItem(sourceItem);
         
-        updateFormationName(data.lineupA);
-        updateFormationName(data.lineupB);
+        updateFormationName(simData.lineupA);
+        updateFormationName(simData.lineupB);
     }
 
-    const statsA = calculateTeamStatsLineup(data.lineupA.lineup);
-    const statsB = calculateTeamStatsLineup(data.lineupB.lineup);
+    const newStatsA = calculateTeamStatsLineup(simData.lineupA.lineup);
+    const newStatsB = calculateTeamStatsLineup(simData.lineupB.lineup);
     
-    data.lineupA.stats = statsA;
-    data.lineupB.stats = statsB;
+    simData.lineupA.stats = newStatsA;
+    simData.lineupB.stats = newStatsB;
 
-    const isHavaLow = document.getElementById('cbLowHava')?.checked;
-    const statCount = isHavaLow ? 5 : 6;
+    const isHavaLowPriority = document.getElementById('cbLowHava')?.checked;
+    const activeStatCount = isHavaLowPriority ? 5 : 6;
     
-    let sumA_total = statsA.normalized.pas + statsA.normalized.savunma + statsA.normalized.sut + statsA.normalized.dribling + statsA.normalized.firsat;
-    let sumB_total = statsB.normalized.pas + statsB.normalized.savunma + statsB.normalized.sut + statsB.normalized.dribling + statsB.normalized.firsat;
+    let totalSumA = newStatsA.normalized.pas + newStatsA.normalized.savunma + newStatsA.normalized.sut + newStatsA.normalized.dribling + newStatsA.normalized.firsat;
+    let totalSumB = newStatsB.normalized.pas + newStatsB.normalized.savunma + newStatsB.normalized.sut + newStatsB.normalized.dribling + newStatsB.normalized.firsat;
     
-    if (!isHavaLow) {
-        sumA_total += statsA.normalized.hava;
-        sumB_total += statsB.normalized.hava;
+    if (!isHavaLowPriority) {
+        totalSumA += newStatsA.normalized.hava;
+        totalSumB += newStatsB.normalized.hava;
     }
     
-    data.sumA = sumA_total / statCount;
-    data.sumB = sumB_total / statCount;
-    data.rawPenalty = Math.abs(data.sumA - data.sumB) * 1000.0;
+    simData.sumA = totalSumA / activeStatCount;
+    simData.sumB = totalSumB / activeStatCount;
+    simData.rawPenalty = Math.abs(simData.sumA - simData.sumB) * 1000.0;
 
     document.body.classList.remove('is-dragging');
     renderSimCard(cardIndex);
 };
 
-document.addEventListener('dragstart', (e) => {
-    const playerEl = e.target.closest('.pitch-player');
-    if (playerEl && playerEl.dataset.card) {
-        e.dataTransfer.setData('text/plain', JSON.stringify({
-            card: playerEl.dataset.card,
-            team: playerEl.dataset.team,
-            slot: playerEl.dataset.slot
+document.addEventListener('dragstart', (event) => {
+    const targetPlayerElement = event.target.closest('.pitch-player');
+    if (targetPlayerElement && targetPlayerElement.dataset.card) {
+        event.dataTransfer.setData('text/plain', JSON.stringify({
+            card: targetPlayerElement.dataset.card,
+            team: targetPlayerElement.dataset.team,
+            slot: targetPlayerElement.dataset.slot
         }));
-        e.dataTransfer.effectAllowed = 'move';
-        playerEl.style.opacity = '0.4';
+        event.dataTransfer.effectAllowed = 'move';
+        targetPlayerElement.style.opacity = '0.4';
         
         document.body.classList.add('is-dragging');
     }
 });
 
-document.addEventListener('dragend', (e) => {
-    const playerEl = e.target.closest('.pitch-player');
-    if (playerEl) playerEl.style.opacity = '1';
+document.addEventListener('dragend', (event) => {
+    const targetPlayerElement = event.target.closest('.pitch-player');
+    if (targetPlayerElement) targetPlayerElement.style.opacity = '1';
     
     document.body.classList.remove('is-dragging');
-    document.querySelectorAll('.pitch-empty-slot').forEach(el => {
-        el.style.opacity = '0';
-        el.style.pointerEvents = 'none';
-        el.style.borderColor = 'rgba(255,255,255,0.4)';
-        el.style.background = 'rgba(0,0,0,0.2)';
+    document.querySelectorAll('.pitch-empty-slot').forEach(element => {
+        element.style.opacity = '0';
+        element.style.pointerEvents = 'none';
+        element.style.borderColor = 'rgba(255,255,255,0.4)';
+        element.style.background = 'rgba(0,0,0,0.2)';
     });
 });
 
-document.addEventListener('dragover', (e) => {
-    const dropTarget = e.target.closest('.pitch-player, .pitch-empty-slot');
-    if (dropTarget) {
-        e.preventDefault(); 
-        e.dataTransfer.dropEffect = 'move';
-        if (dropTarget.classList.contains('pitch-empty-slot')) {
-            dropTarget.style.borderColor = '#2ecc71';
-            dropTarget.style.background = 'rgba(46, 204, 113, 0.4)';
+document.addEventListener('dragover', (event) => {
+    const dropZone = event.target.closest('.pitch-player, .pitch-empty-slot');
+    if (dropZone) {
+        event.preventDefault(); 
+        event.dataTransfer.dropEffect = 'move';
+        if (dropZone.classList.contains('pitch-empty-slot')) {
+            dropZone.style.borderColor = '#2ecc71';
+            dropZone.style.background = 'rgba(46, 204, 113, 0.4)';
         }
     }
 });
 
-document.addEventListener('dragleave', (e) => {
-    const emptySlot = e.target.closest('.pitch-empty-slot');
-    if (emptySlot) {
-        emptySlot.style.borderColor = 'rgba(255,255,255,0.4)';
-        emptySlot.style.background = 'rgba(0,0,0,0.2)';
+document.addEventListener('dragleave', (event) => {
+    const emptySlotZone = event.target.closest('.pitch-empty-slot');
+    if (emptySlotZone) {
+        emptySlotZone.style.borderColor = 'rgba(255,255,255,0.4)';
+        emptySlotZone.style.background = 'rgba(0,0,0,0.2)';
     }
 });
 
-document.addEventListener('drop', (e) => {
+document.addEventListener('drop', (event) => {
     document.body.classList.remove('is-dragging');
-    const targetEl = e.target.closest('.pitch-player, .pitch-empty-slot');
-    if (targetEl && targetEl.dataset.card) {
-        e.preventDefault();
-        document.querySelectorAll('.pitch-empty-slot').forEach(el => {
-            el.style.opacity = '0';
-            el.style.pointerEvents = 'none';
-            el.style.borderColor = 'rgba(255,255,255,0.4)';
-            el.style.background = 'rgba(0,0,0,0.2)';
+    const targetElement = event.target.closest('.pitch-player, .pitch-empty-slot');
+    if (targetElement && targetElement.dataset.card) {
+        event.preventDefault();
+        document.querySelectorAll('.pitch-empty-slot').forEach(element => {
+            element.style.opacity = '0';
+            element.style.pointerEvents = 'none';
+            element.style.borderColor = 'rgba(255,255,255,0.4)';
+            element.style.background = 'rgba(0,0,0,0.2)';
         });
-        const rawData = e.dataTransfer.getData('text/plain');
-        if (!rawData) return;
+        const transferData = event.dataTransfer.getData('text/plain');
+        if (!transferData) return;
         try {
-            const sourceData = JSON.parse(rawData);
-            const targetData = {
-                card: targetEl.dataset.card,
-                team: targetEl.dataset.team,
-                slot: targetEl.dataset.slot
+            const parsedSourceData = JSON.parse(transferData);
+            const compiledTargetData = {
+                card: targetElement.dataset.card,
+                team: targetElement.dataset.team,
+                slot: targetElement.dataset.slot
             };
-            if (sourceData.card === targetData.card && (sourceData.team !== targetData.team || sourceData.slot !== targetData.slot)) {
-                window.handlePlayerSwap(sourceData, targetData);
+            if (parsedSourceData.card === compiledTargetData.card && (parsedSourceData.team !== compiledTargetData.team || parsedSourceData.slot !== compiledTargetData.slot)) {
+                window.handlePlayerSwap(parsedSourceData, compiledTargetData);
             }
-        } catch(err) { console.error("Swap Hatası:", err); }
+        } catch(error) { console.error("Oyuncu Takası İşlem Hatası:", error); }
     }
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-    const safeSetVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
-    ['sPas', 'sSavunma', 'sSut', 'sDribling', 'sFirsat', 'sHava'].forEach(id => safeSetVal(id, 40));
-    safeSetVal('sSutKar', 0);
-    safeSetVal('pName', "");
-    safeSetVal('pLastName', "");
-    safeSetVal('pShortName', "");
-    safeSetVal('pMainPos', "CB");
-    safeSetVal('pCond', "Tam");
+    const safeInputValueAssigner = (elementId, value) => { const elem = document.getElementById(elementId); if (elem) elem.value = value; };
+    ['sPas', 'sSavunma', 'sSut', 'sDribling', 'sFirsat', 'sHava'].forEach(id => safeInputValueAssigner(id, 40));
+    safeInputValueAssigner('sSutKar', 0);
+    safeInputValueAssigner('pName', "");
+    safeInputValueAssigner('pLastName', "");
+    safeInputValueAssigner('pShortName', "");
+    safeInputValueAssigner('pMainPos', "CB");
+    safeInputValueAssigner('pCond', "Tam");
+
+    if (!document.getElementById('sim-pitch-fix')) {
+        const simPitchFixStyles = document.createElement('style');
+        simPitchFixStyles.id = 'sim-pitch-fix';
+        simPitchFixStyles.innerHTML = `
+            /* Saha yatay eksende genişletildi (En-boy oranı kareye çok daha yakın) */
+            .pitch-inner {
+                aspect-ratio: 1 / 1.15 !important; 
+                min-height: 550px !important; 
+            }
+            /* Mobilde de aynı şekilde genişlik artırıldı */
+            @media (max-width: 900px) {
+                .pitch-inner {
+                    aspect-ratio: 1 / 1.25 !important; 
+                    min-height: 550px !important;
+                }
+            }
+        `;
+        document.head.appendChild(simPitchFixStyles);
+    }
 
     if (!document.getElementById('stats-grid-fix-new')) {
-        const sgf = document.createElement('style');
-        sgf.id = 'stats-grid-fix-new';
-        sgf.innerHTML = `
+        const statsGridStyles = document.createElement('style');
+        statsGridStyles.id = 'stats-grid-fix-new';
+        statsGridStyles.innerHTML = `
             .stat-box { display: flex; flex-direction: column; width: 100%; }
-            .spinner-wrapper { display: flex; width: 100%; height: 42px !important; } /* Kutu yüksekliği artırıldı */
+            .spinner-wrapper { display: flex; width: 100%; height: 42px !important; } 
             .spinner-wrapper input { 
                 width: 100%; 
                 min-width: 0; 
                 box-sizing: border-box; 
-                padding: 10px 0 !important; /* Sayıların üstüne ve altına geniş boşluk eklendi */
-                font-size: 1.2em !important; /* Sayılar daha net okunması için büyütüldü */
+                padding: 10px 0 !important; 
+                font-size: 1.2em !important; 
                 height: 100% !important; 
             }
             .spin-btn { height: 100% !important; }
         `;
-        document.head.appendChild(sgf);
+        document.head.appendChild(statsGridStyles);
     }
 
     if (!document.getElementById('pitch-map-styles')) {
-        const pms = document.createElement('style');
-        pms.id = 'pitch-map-styles';
-        pms.innerHTML = `
+        const pitchMapStyles = document.createElement('style');
+        pitchMapStyles.id = 'pitch-map-styles';
+        pitchMapStyles.innerHTML = `
             #secPosMap {
                 display: block !important;
                 position: relative;
@@ -326,7 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 background: var(--pitch-bg);
                 border: 2px solid rgba(255,255,255,0.4);
                 border-radius: 8px;
-                padding-bottom: 165%; /* Haritayı dikeyde daha da uzattık */
+                padding-bottom: 165%; 
                 margin-top: 15px;
                 box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
                 overflow: hidden;
@@ -335,42 +355,56 @@ document.addEventListener('DOMContentLoaded', () => {
             #secPosMap::after { content: ''; position: absolute; bottom: 0; left: 20%; width: 60%; height: 16%; border: 2px solid rgba(255,255,255,0.4); border-bottom: none; pointer-events: none; }
             .pitch-center-line { position: absolute; top: 50%; left: 0; width: 100%; height: 2px; background: rgba(255,255,255,0.4); transform: translateY(-50%); pointer-events: none; }
             .pitch-center-circle { position: absolute; top: 50%; left: 50%; width: 60px; height: 60px; border: 2px solid rgba(255,255,255,0.4); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+            
             .pos-btn-group {
-                position: absolute; transform: translate(-50%, -50%); width: 26%; min-width: 80px; max-width: 110px;
-                background: var(--bg-panel); border: 2px solid var(--border-color); padding: 4px; border-radius: 6px;
+                position: absolute; transform: translate(-50%, -50%); width: 26%; min-width: 75px; max-width: 100px;
+                background: var(--bg-panel); border: 2px solid var(--border-color); padding: 2px 4px; border-radius: 6px;
                 cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center;
                 text-align: center; transition: opacity 0.2s, box-shadow 0.2s; box-shadow: 0 3px 6px rgba(0,0,0,0.4); opacity: 0.65; z-index: 5;
             }
             .pos-btn-group:hover { opacity: 0.95; z-index: 20 !important; }
             .pos-btn-group.active-sec, .pos-btn-group.main-pos { opacity: 1; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.8); }
-            .pos-btn-group.main-pos { z-index: 15; border-width: 3px; }
+            .pos-btn-group.main-pos { z-index: 15; border-width: 2px; }
             .node-header { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px; }
-            .node-name { font-weight: 900; font-size: 0.9em; color: var(--text-main); }
-            .node-ovr { font-size: 0.8em; font-weight: bold; padding: 2px 4px; border-radius: 4px; background: rgba(0,0,0,0.1); }
-            .sec-controls { display: none; width: 100%; flex-direction: column; gap: 3px; margin-top: 4px; }
+            .node-name { font-weight: 900; font-size: 0.8em; color: var(--text-main); }
+            .node-ovr { font-size: 0.7em; font-weight: bold; padding: 2px 4px; border-radius: 4px; background: rgba(0,0,0,0.1); }
+            .sec-controls { display: none; width: 100%; flex-direction: column; gap: 2px; margin-top: 2px; }
             .pos-btn-group.active-sec .sec-controls { display: flex; }
-            .role-select { font-size: 0.65em; width: 100%; padding: 2px; cursor: pointer; border-radius: 3px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-main); }
-            .spinner-wrapper { height: 20px; display: flex; width: 100%; }
-            .spin-btn { width: 22px; font-size: 1.1em; line-height: 1; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.1); border:none; color: var(--text-main); cursor:pointer; }
-            .cap-input { font-size: 0.8em; padding: 0; text-align: center; flex: 1; border:none; background: var(--bg-input); color:var(--text-main); width: 100%; }
+            
+            .role-select { font-size: 0.6em; width: 100%; padding: 1px; cursor: pointer; border-radius: 3px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-main); height: 18px; }
+            .spinner-wrapper { height: 18px; display: flex; width: 100%; }
+            .spin-btn { width: 20px; font-size: 1em; line-height: 1; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.1); border:none; color: var(--text-main); cursor:pointer; padding:0; }
+            .cap-input { font-size: 0.75em; padding: 0; text-align: center; flex: 1; border:none; background: var(--bg-input); color:var(--text-main); width: 100%; min-width:0; }
+
+            @media (max-width: 600px) {
+                #secPosMap { padding-bottom: 185%; } 
+                .pos-btn-group { min-width: 60px; width: 27%; padding: 2px; border-width: 1px; }
+                .pos-btn-group.main-pos { border-width: 2px; }
+                .node-name { font-size: 0.7em; }
+                .node-ovr { font-size: 0.65em; padding: 1px 3px; }
+                .role-select { font-size: 0.55em; height: 16px; }
+                .spinner-wrapper { height: 16px; }
+                .spin-btn { width: 16px; font-size: 0.9em; }
+                .cap-input { font-size: 0.7em; }
+            }
         `;
-        document.head.appendChild(pms);
+        document.head.appendChild(pitchMapStyles);
     }
 
     if (!document.getElementById('drag-styles')) {
-        const ds = document.createElement('style');
-        ds.id = 'drag-styles';
-        ds.innerHTML = `
+        const dragStyles = document.createElement('style');
+        dragStyles.id = 'drag-styles';
+        dragStyles.innerHTML = `
             .pitch-empty-slot { opacity: 0; pointer-events: none; transition: opacity 0.2s ease, background 0.2s ease, border-color 0.2s ease; }
             body.is-dragging .pitch-empty-slot { opacity: 1 !important; pointer-events: auto !important; }
         `;
-        document.head.appendChild(ds);
+        document.head.appendChild(dragStyles);
     }
     
     if (!document.getElementById('mobile-responsive-styles')) {
-        const ms = document.createElement('style');
-        ms.id = 'mobile-responsive-styles';
-        ms.innerHTML = `
+        const mobileStyles = document.createElement('style');
+        mobileStyles.id = 'mobile-responsive-styles';
+        mobileStyles.innerHTML = `
             *, *::before, *::after { box-sizing: border-box; }
             @media (max-width: 900px) {
                 .left-panel .btn-group, .right-panel .btn-group { flex-direction: column !important; }
@@ -383,189 +417,189 @@ document.addEventListener('DOMContentLoaded', () => {
                 .db-container .btn-group { min-width: 0 !important; width: 100% !important; }
             }
         `;
-        document.head.appendChild(ms);
+        document.head.appendChild(mobileStyles);
     }
 
-    const livePitchWrap = document.getElementById('livePitchWrap');
-    if (livePitchWrap) livePitchWrap.style.display = 'none';
+    const livePitchWrapper = document.getElementById('livePitchWrap');
+    if (livePitchWrapper) livePitchWrapper.style.display = 'none';
 
-    const savedSettings = JSON.parse(localStorage.getItem('app_settings')) || { darkMode: false, hideOvr: false, lowHava: true, teamColors: false };
-    const cbDarkMode = document.getElementById('cbDarkMode');
-    const cbHideOvr = document.getElementById('cbHideOvr');
-    const cbLowHava = document.getElementById('cbLowHava');
-    const cbTeamColors = document.getElementById('cbTeamColors');
+    const savedSettingsInfo = JSON.parse(localStorage.getItem('app_settings')) || { darkMode: false, hideOvr: false, lowHava: true, teamColors: false };
+    const checkboxDarkMode = document.getElementById('cbDarkMode');
+    const checkboxHideOvr = document.getElementById('cbHideOvr');
+    const checkboxLowHava = document.getElementById('cbLowHava');
+    const checkboxTeamColors = document.getElementById('cbTeamColors');
 
-    if (cbDarkMode) cbDarkMode.checked = savedSettings.darkMode;
-    if (cbHideOvr) cbHideOvr.checked = savedSettings.hideOvr;
-    if (cbLowHava) cbLowHava.checked = savedSettings.lowHava;
-    if (cbTeamColors) cbTeamColors.checked = savedSettings.teamColors;
+    if (checkboxDarkMode) checkboxDarkMode.checked = savedSettingsInfo.darkMode;
+    if (checkboxHideOvr) checkboxHideOvr.checked = savedSettingsInfo.hideOvr;
+    if (checkboxLowHava) checkboxLowHava.checked = savedSettingsInfo.lowHava;
+    if (checkboxTeamColors) checkboxTeamColors.checked = savedSettingsInfo.teamColors;
 
-    if (savedSettings.darkMode) document.body.classList.add('dark-mode');
+    if (savedSettingsInfo.darkMode) document.body.classList.add('dark-mode');
     
-    if (savedSettings.hideOvr) {
-        const styleId = 'hide-ovr-style';
-        if (!document.getElementById(styleId)) {
-            let s = document.createElement('style'); s.id = styleId;
-            s.innerHTML = '.pitch-container .pitch-ovr-text, .pitch-container .cond-icon { display: none !important; }';
-            document.head.appendChild(s);
+    if (savedSettingsInfo.hideOvr) {
+        const customStyleId = 'hide-ovr-style';
+        if (!document.getElementById(customStyleId)) {
+            let styleNode = document.createElement('style'); styleNode.id = customStyleId;
+            styleNode.innerHTML = '.pitch-container .pitch-ovr-text, .pitch-container .cond-icon { display: none !important; }';
+            document.head.appendChild(styleNode);
         }
     }
 
-    const saveSettings = () => {
+    const triggerSettingsSave = () => {
         localStorage.setItem('app_settings', JSON.stringify({
-            darkMode: cbDarkMode?.checked || false,
-            hideOvr: cbHideOvr?.checked || false,
-            lowHava: cbLowHava?.checked || false,
-            teamColors: cbTeamColors?.checked || false
+            darkMode: checkboxDarkMode?.checked || false,
+            hideOvr: checkboxHideOvr?.checked || false,
+            lowHava: checkboxLowHava?.checked || false,
+            teamColors: checkboxTeamColors?.checked || false
         }));
     };
 
-    cbDarkMode?.addEventListener('change', (e) => {
-        if (e.target.checked) document.body.classList.add('dark-mode');
+    checkboxDarkMode?.addEventListener('change', (event) => {
+        if (event.target.checked) document.body.classList.add('dark-mode');
         else document.body.classList.remove('dark-mode');
-        saveSettings();
+        triggerSettingsSave();
     });
 
-    cbHideOvr?.addEventListener('change', (e) => {
-        const styleId = 'hide-ovr-style';
-        let s = document.getElementById(styleId);
-        if (e.target.checked) {
-            if (!s) {
-                s = document.createElement('style'); s.id = styleId;
-                s.innerHTML = '.pitch-container .pitch-ovr-text, .pitch-container .cond-icon { display: none !important; }';
-                document.head.appendChild(s);
+    checkboxHideOvr?.addEventListener('change', (event) => {
+        const customStyleId = 'hide-ovr-style';
+        let styleNode = document.getElementById(customStyleId);
+        if (event.target.checked) {
+            if (!styleNode) {
+                styleNode = document.createElement('style'); styleNode.id = customStyleId;
+                styleNode.innerHTML = '.pitch-container .pitch-ovr-text, .pitch-container .cond-icon { display: none !important; }';
+                document.head.appendChild(styleNode);
             }
-        } else { if (s) s.remove(); }
-        saveSettings();
+        } else { if (styleNode) styleNode.remove(); }
+        triggerSettingsSave();
     });
 
-    cbLowHava?.addEventListener('change', saveSettings);
+    checkboxLowHava?.addEventListener('change', triggerSettingsSave);
     
-    cbTeamColors?.addEventListener('change', () => {
-        saveSettings();
+    checkboxTeamColors?.addEventListener('change', () => {
+        triggerSettingsSave();
         if (simResults.length > 0 && document.querySelector('.sim-result-card')) {
             for (let i = 0; i < simResults.length; i++) { renderSimCard(i); }
         }
     });
 
-    document.getElementById('btnRoleManager')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        const posSelect = document.getElementById('rmPos');
-        posSelect.innerHTML = Object.keys(ROLE_WEIGHTS).map(p => `<option value="${p}">${p}</option>`).join('');
-        posSelect.onchange = () => updateRmRoles();
-        document.getElementById('rmRole').onchange = () => updateRmInputs();
-        updateRmRoles();
+    document.getElementById('btnRoleManager')?.addEventListener('click', (event) => {
+        event.preventDefault();
+        const posSelectorElement = document.getElementById('rmPos');
+        posSelectorElement.innerHTML = Object.keys(ROLE_WEIGHTS).map(positionKey => `<option value="${positionKey}">${positionKey}</option>`).join('');
+        posSelectorElement.onchange = () => updateRoleManagerRoles();
+        document.getElementById('rmRole').onchange = () => updateRoleManagerInputs();
+        updateRoleManagerRoles();
         document.getElementById('roleModal').style.display = 'flex';
     });
 
     document.getElementById('rmCancel')?.addEventListener('click', () => { document.getElementById('roleModal').style.display = 'none'; });
     
     document.getElementById('rmSave')?.addEventListener('click', () => {
-        const pos = document.getElementById('rmPos').value;
-        const role = document.getElementById('rmRole').value;
-        const weights = ROLE_WEIGHTS[pos][role];
-        const keys = ['pas', 'savunma', 'sut', 'dribling', 'firsat', 'hava'];
-        if(pos === 'GK') keys.push('sutKarsilama');
+        const targetPos = document.getElementById('rmPos').value;
+        const targetRole = document.getElementById('rmRole').value;
+        const targetWeights = ROLE_WEIGHTS[targetPos][targetRole];
+        const statKeys = ['pas', 'savunma', 'sut', 'dribling', 'firsat', 'hava'];
+        if(targetPos === 'GK') statKeys.push('sutKarsilama');
         
-        keys.forEach(k => {
-            if(weights[k] !== undefined) { weights[k] = Number(document.getElementById(`rm_${k}`).value) || 0; }
+        statKeys.forEach(statKey => {
+            if(targetWeights[statKey] !== undefined) { targetWeights[statKey] = Number(document.getElementById(`rm_${statKey}`).value) || 0; }
         });
         saveRoleWeights(); updateLiveRoles(); updatePlayerList();
-        alert(`"${role}" rolü başarıyla kaydedildi!`);
+        alert(`"${targetRole}" rolü başarıyla kaydedildi.`);
     });
 
     document.getElementById('rmReset')?.addEventListener('click', () => {
         if(confirm("Tüm rolleri varsayılan hallerine sıfırlamak istediğinize emin misiniz?")) {
-            resetRoleWeights(); updateRmInputs(); updateLiveRoles(); updatePlayerList();
-            alert("Tüm roller sıfırlandı.");
+            resetRoleWeights(); updateRoleManagerInputs(); updateLiveRoles(); updatePlayerList();
+            alert("Sistemdeki tüm roller sıfırlandı.");
         }
     });
 
-    document.getElementById('btnToggleSelection')?.addEventListener('click', (e) => { 
-        e.preventDefault(); 
-        const allSelected = currentPlayers.length > 0 && currentPlayers.every(p => p.selected);
-        currentPlayers.forEach(p => p.selected = !allSelected); 
+    document.getElementById('btnToggleSelection')?.addEventListener('click', (event) => { 
+        event.preventDefault(); 
+        const isEveryPlayerSelected = currentPlayers.length > 0 && currentPlayers.every(playerObj => playerObj.selected);
+        currentPlayers.forEach(playerObj => playerObj.selected = !isEveryPlayerSelected); 
         updatePlayerList(); 
     });
     
-    document.getElementById('btnDeleteSelected')?.addEventListener('click', (e) => { 
-        e.preventDefault(); 
+    document.getElementById('btnDeleteSelected')?.addEventListener('click', (event) => { 
+        event.preventDefault(); 
         if(confirm('Seçili oyuncuları havuzdan silmek istediğinize emin misiniz?')) {
-            currentPlayers = currentPlayers.filter(p => !p.selected); 
+            currentPlayers = currentPlayers.filter(playerObj => !playerObj.selected); 
             updatePlayerList(); 
             renderPositionMap();
         }
     });
     
     document.getElementById('btnRandomSelect')?.addEventListener('click', selectRandomPlayers);
-    document.getElementById('btnLoadDummies')?.addEventListener('click', loadDummies);
-    document.getElementById('btnRemoveDummies')?.addEventListener('click', (e) => { e.preventDefault(); currentPlayers = currentPlayers.filter(p => !p.isTest); updatePlayerList(); renderPositionMap(); });
+    document.getElementById('btnLoadDummies')?.addEventListener('click', loadDummyTestPlayers);
+    document.getElementById('btnRemoveDummies')?.addEventListener('click', (event) => { event.preventDefault(); currentPlayers = currentPlayers.filter(playerObj => !playerObj.isTest); updatePlayerList(); renderPositionMap(); });
     document.getElementById('btnSaveNew')?.addEventListener('click', saveNewDatabase);
     document.getElementById('btnLoadDB')?.addEventListener('click', loadDatabase);
     document.getElementById('btnUpdateDB')?.addEventListener('click', updateDatabase);
     document.getElementById('btnDeleteDB')?.addEventListener('click', deleteDatabase);
     document.getElementById('btnExportJSON')?.addEventListener('click', exportDatabases);
     document.getElementById('btnImportJSON')?.addEventListener('click', importDatabases);
-    document.getElementById('btnAddPlayer')?.addEventListener('click', handleAddPlayer);
-    document.getElementById('btnCancelEdit')?.addEventListener('click', cancelEdit);
-    document.getElementById('btnRunSim')?.addEventListener('click', runSimulation);
+    document.getElementById('btnAddPlayer')?.addEventListener('click', handlePlayerAdditionProcess);
+    document.getElementById('btnCancelEdit')?.addEventListener('click', cancelPlayerEdit);
+    document.getElementById('btnRunSim')?.addEventListener('click', triggerSimulationExecution);
     document.getElementById('pMainPos')?.addEventListener('change', () => { renderPositionMap(); updateLiveRoles(); });
     document.getElementById('matchFormat')?.addEventListener('change', updatePlayerList);
 
-    document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('btn-reset-sim')) {
-            e.preventDefault();
+    document.addEventListener('click', (event) => {
+        if (event.target.classList.contains('btn-reset-sim')) {
+            event.preventDefault();
             document.body.classList.remove('is-dragging');
-            const cardIndex = parseInt(e.target.dataset.card);
-            if (simResults[cardIndex]) {
-                simResults[cardIndex].active = JSON.parse(JSON.stringify(simResults[cardIndex].original));
-                renderSimCard(cardIndex);
+            const targetCardIndex = parseInt(event.target.dataset.card);
+            if (simResults[targetCardIndex]) {
+                simResults[targetCardIndex].active = JSON.parse(JSON.stringify(simResults[targetCardIndex].original));
+                renderSimCard(targetCardIndex);
             }
             return;
         }
 
-        const pitchNode = e.target.closest('.pitch-node-clickable');
-        if (pitchNode) {
-            e.preventDefault(); e.stopPropagation(); 
-            const pidStr = pitchNode.dataset.pid; const pos = pitchNode.dataset.pos;
-            if (!pidStr || !pos) return;
-            const player = currentPlayers.find(p => String(p.id) === String(pidStr));
-            if (player) {
-                if (!player.bannedPositions) player.bannedPositions = [];
-                if (player.bannedPositions.includes(pos)) player.bannedPositions = player.bannedPositions.filter(p => p !== pos);
-                else player.bannedPositions.push(pos);
+        const pitchNodeInteraction = event.target.closest('.pitch-node-clickable');
+        if (pitchNodeInteraction) {
+            event.preventDefault(); event.stopPropagation(); 
+            const targetPlayerId = pitchNodeInteraction.dataset.pid; const targetPos = pitchNodeInteraction.dataset.pos;
+            if (!targetPlayerId || !targetPos) return;
+            const playerReference = currentPlayers.find(p => String(p.id) === String(targetPlayerId));
+            if (playerReference) {
+                if (!playerReference.bannedPositions) playerReference.bannedPositions = [];
+                if (playerReference.bannedPositions.includes(targetPos)) playerReference.bannedPositions = playerReference.bannedPositions.filter(p => p !== targetPos);
+                else playerReference.bannedPositions.push(targetPos);
                 updatePlayerList(); 
             } return;
         }
         
-        const playerEl = e.target.closest('.pitch-player');
-        if (playerEl) { 
-            if (playerEl.dataset.pinfo) {
-                const info = JSON.parse(decodeURIComponent(playerEl.dataset.pinfo)); 
-                openPlayerModal(info); 
+        const contextualPlayerNode = event.target.closest('.pitch-player');
+        if (contextualPlayerNode) { 
+            if (contextualPlayerNode.dataset.pinfo) {
+                const infoDataObj = JSON.parse(decodeURIComponent(contextualPlayerNode.dataset.pinfo)); 
+                openPlayerDetailModal(infoDataObj); 
             }
         }
-        if (e.target.id === 'playerModal' || e.target.id === 'closeModal') { document.getElementById('playerModal').style.display = 'none'; }
+        if (event.target.id === 'playerModal' || event.target.id === 'closeModal') { document.getElementById('playerModal').style.display = 'none'; }
 
-        if (e.target.classList.contains('spin-btn')) {
-            e.preventDefault(); const input = e.target.parentElement.querySelector('input'); if(!input) return;
-            let val = parseInt(input.value) || 0; const step = parseInt(input.step) || 5; const max = parseInt(input.max) || 100; const min = parseInt(input.min) || 0;
-            if (e.target.classList.contains('plus')) val = Math.min(max, val + step);
-            if (e.target.classList.contains('minus')) val = Math.max(min, val - step);
-            input.value = val; updateLiveRoles(); 
+        if (event.target.classList.contains('spin-btn')) {
+            event.preventDefault(); const targetInputElem = event.target.parentElement.querySelector('input'); if(!targetInputElem) return;
+            let currentValue = parseInt(targetInputElem.value) || 0; const valueStep = parseInt(targetInputElem.step) || 5; const maxLimit = parseInt(targetInputElem.max) || 100; const minLimit = parseInt(targetInputElem.min) || 0;
+            if (event.target.classList.contains('plus')) currentValue = Math.min(maxLimit, currentValue + valueStep);
+            if (event.target.classList.contains('minus')) currentValue = Math.max(minLimit, currentValue - valueStep);
+            targetInputElem.value = currentValue; updateLiveRoles(); 
         }
         
-        if (e.target.classList.contains('btn-delete')) {
-            currentPlayers = currentPlayers.filter(p => String(p.id) !== String(e.target.dataset.id)); updatePlayerList();
+        if (event.target.classList.contains('btn-delete')) {
+            currentPlayers = currentPlayers.filter(p => String(p.id) !== String(event.target.dataset.id)); updatePlayerList();
         }
-        if (e.target.classList.contains('btn-edit')) {
-            editPlayer(e.target.dataset.id);
+        if (event.target.classList.contains('btn-edit')) {
+            initializePlayerEditSequence(event.target.dataset.id);
         }
     });
 
-    ['sPas', 'sSavunma', 'sSut', 'sDribling', 'sFirsat', 'sHava', 'sSutKar', 'pName', 'pLastName', 'pShortName'].forEach(id => {
-        document.getElementById(id)?.addEventListener('input', updateLiveRoles);
-        document.getElementById(id)?.addEventListener('change', updateLiveRoles);
+    ['sPas', 'sSavunma', 'sSut', 'sDribling', 'sFirsat', 'sHava', 'sSutKar', 'pName', 'pLastName', 'pShortName'].forEach(idString => {
+        document.getElementById(idString)?.addEventListener('input', updateLiveRoles);
+        document.getElementById(idString)?.addEventListener('change', updateLiveRoles);
     });
 
     document.getElementById('pCond')?.addEventListener('change', () => {
@@ -574,318 +608,330 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     updateCondPreview();
-    refreshDatabaseSelect(); 
+    refreshDatabaseSelectionMenu(); 
     renderPositionMap();
 
-    const lastDb = localStorage.getItem('last_used_db');
-    if (lastDb && getDatabases()[lastDb]) {
-        const selectEl = document.getElementById('dbSelect');
-        if (selectEl) selectEl.value = lastDb;
-        currentPlayers = [...getDatabases()[lastDb].map((p, i) => { 
-            let n = {...p, id: Date.now() + i + Math.random()}; 
-            if (!n.bannedPositions) n.bannedPositions = []; 
-            return n; 
+    const lastUsedDatabaseKey = localStorage.getItem('last_used_db');
+    if (lastUsedDatabaseKey && getSavedDatabases()[lastUsedDatabaseKey]) {
+        const dbSelectorNode = document.getElementById('dbSelect');
+        if (dbSelectorNode) dbSelectorNode.value = lastUsedDatabaseKey;
+        currentPlayers = [...getSavedDatabases()[lastUsedDatabaseKey].map((p, index) => { 
+            let mappedPlayerObj = {...p, id: Date.now() + index + Math.random()}; 
+            if (!mappedPlayerObj.bannedPositions) mappedPlayerObj.bannedPositions = []; 
+            return mappedPlayerObj; 
         })];
         updatePlayerList();
     }
 });
 
-function updateRmRoles() {
-    const pos = document.getElementById('rmPos').value;
-    const roleSelect = document.getElementById('rmRole');
-    roleSelect.innerHTML = Object.keys(ROLE_WEIGHTS[pos]).map(r => `<option value="${r}">${r}</option>`).join('');
-    updateRmInputs();
+function updateRoleManagerRoles() {
+    const activePositionVal = document.getElementById('rmPos').value;
+    const roleDropdownNode = document.getElementById('rmRole');
+    roleDropdownNode.innerHTML = Object.keys(ROLE_WEIGHTS[activePositionVal]).map(roleName => `<option value="${roleName}">${roleName}</option>`).join('');
+    updateRoleManagerInputs();
 }
 
-function updateRmInputs() {
-    const pos = document.getElementById('rmPos').value;
-    const role = document.getElementById('rmRole').value;
-    const weights = ROLE_WEIGHTS[pos][role];
-    const inputsDiv = document.getElementById('rmInputs');
-    inputsDiv.innerHTML = '';
+function updateRoleManagerInputs() {
+    const activePositionVal = document.getElementById('rmPos').value;
+    const activeRoleVal = document.getElementById('rmRole').value;
+    const selectedWeightsConfig = ROLE_WEIGHTS[activePositionVal][activeRoleVal];
+    const inputsContainerNode = document.getElementById('rmInputs');
+    inputsContainerNode.innerHTML = '';
 
-    const keys = ['pas', 'savunma', 'sut', 'dribling', 'firsat', 'hava'];
-    if(pos === 'GK') keys.push('sutKarsilama');
+    const internalStatKeys = ['pas', 'savunma', 'sut', 'dribling', 'firsat', 'hava'];
+    if(activePositionVal === 'GK') internalStatKeys.push('sutKarsilama');
 
-    keys.forEach(k => {
-        if(weights[k] !== undefined) {
-            inputsDiv.innerHTML += `
+    internalStatKeys.forEach(statKey => {
+        if(selectedWeightsConfig[statKey] !== undefined) {
+            inputsContainerNode.innerHTML += `
                 <div style="display:flex; flex-direction:column;">
-                    <label style="font-size:0.85em; color:var(--text-muted); margin-bottom:2px; font-weight:bold;">${k.toUpperCase()}</label>
-                    <input type="number" id="rm_${k}" value="${weights[k]}" style="padding:8px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-main); font-weight:bold;">
+                    <label style="font-size:0.85em; color:var(--text-muted); margin-bottom:2px; font-weight:bold;">${statKey.toUpperCase()}</label>
+                    <input type="number" id="rm_${statKey}" value="${selectedWeightsConfig[statKey]}" style="padding:8px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-main); font-weight:bold;">
                 </div>
             `;
         }
     });
     
-    keys.forEach(k => {
-        if(weights[k] !== undefined) {
-            document.getElementById(`rm_${k}`).addEventListener('input', checkRmSum);
+    internalStatKeys.forEach(statKey => {
+        if(selectedWeightsConfig[statKey] !== undefined) {
+            document.getElementById(`rm_${statKey}`).addEventListener('input', validateRoleManagerSum);
         }
     });
-    checkRmSum();
+    validateRoleManagerSum();
 }
 
-function checkRmSum() {
-    let sum = 0;
-    const inputs = document.getElementById('rmInputs').querySelectorAll('input');
-    inputs.forEach(inp => sum += Number(inp.value) || 0);
-    const warning = document.getElementById('rmWarning');
-    warning.innerText = `Toplam Ağırlık: %${sum} ${sum !== 100 ? '(Genelde 100 olması önerilir)' : ''}`;
-    warning.style.color = sum === 100 ? '#2ecc71' : '#e74c3c';
+function validateRoleManagerSum() {
+    let accumulatedSum = 0;
+    const inputNodesCollection = document.getElementById('rmInputs').querySelectorAll('input');
+    inputNodesCollection.forEach(inputNode => accumulatedSum += Number(inputNode.value) || 0);
+    const textWarningNode = document.getElementById('rmWarning');
+    textWarningNode.innerText = `Toplam Ağırlık Oranı: %${accumulatedSum} ${accumulatedSum !== 100 ? '(Ağırlık toplamı %100 olması tavsiye edilir)' : ''}`;
+    textWarningNode.style.color = accumulatedSum === 100 ? '#2ecc71' : '#e74c3c';
 }
 
-function loadDummies(e) {
-    if (e) e.preventDefault();
-    const dummies = generateFallbackDummies();
-    currentPlayers = [...currentPlayers, ...dummies];
+function loadDummyTestPlayers(event) {
+    if (event) event.preventDefault();
+    const generatedDummies = createFallbackTestPlayers();
+    currentPlayers = [...currentPlayers, ...generatedDummies];
     updatePlayerList();
     renderPositionMap();
 }
 
-function generateFallbackDummies() {
-    const c = ["Tam", "İyi", "Vasat", "Kötü"];
-    const d = [
+function createFallbackTestPlayers() {
+    const fallbackConditions = ["Tam", "İyi", "Vasat", "Kötü"];
+    const dummyConfigurationData = [
         { f: "Ali", l: "Yılmaz", pos: "GK", sec: [{pos:"CB", cap:50, role:"Standart Stoper"}, {pos:"DM", cap:40, role:"Kesici"}], s: { pas: 60, savunma: 50, sut: 40, dribling: 40, firsat: 40, hava: 60, sutKarsilama: 90 } }, 
         { f: "Burak", l: "Kaya", pos: "GK", sec: [{pos:"CM", cap:60, role:"İki Yönlü Orta Saha"}], s: { pas: 50, savunma: 60, sut: 30, dribling: 30, firsat: 30, hava: 80, sutKarsilama: 85 } }, 
         { f: "Can", l: "Demir", pos: "CB", sec: [{pos:"LB", cap:85, role:"Defansif Bek"}, {pos:"RB", cap:85, role:"Defansif Bek"}], s: { pas: 50, savunma: 90, sut: 30, dribling: 40, firsat: 30, hava: 90, sutKarsilama: 0 } },
         { f: "Efe", l: "Şahin", pos: "CM", sec: [{pos:"AM", cap:80, role:"Ofansif Oyun Kurucu"}], s: { pas: 85, savunma: 40, sut: 75, dribling: 80, firsat: 90, hava: 50, sutKarsilama: 0 } },
         { f: "Emre", l: "Çelik", pos: "FW", sec: [{pos:"LW", cap:70, role:"İçe Kat Eden Kanat"}], s: { pas: 65, savunma: 30, sut: 90, dribling: 85, firsat: 70, hava: 80, sutKarsilama: 0 } }
     ];
-    return d.map((p, i) => ({ 
+    return dummyConfigurationData.map((dConfig, i) => ({ 
         id: Date.now() + i, 
-        firstName: p.f, 
-        lastName: p.l, 
-        name: `${p.f} ${p.l}`, 
+        firstName: dConfig.f, 
+        lastName: dConfig.l, 
+        name: `${dConfig.f} ${dConfig.l}`, 
         shortName: "", 
-        mainPos: p.pos, 
-        role: p.pos === "GK" ? "Kaleci" : "Standart Stoper", 
-        condition: c[Math.floor(Math.random() * c.length)], 
-        stats: { pas: p.s.pas, savunma: p.s.savunma, sut: p.s.sut, şut: p.s.sut, dribling: p.s.dribling, firsat: p.s.firsat, fırsat: p.s.firsat, hava: p.s.hava, sutKarsilama: p.s.sutKarsilama||0 }, 
+        mainPos: dConfig.pos, 
+        role: dConfig.pos === "GK" ? "Kaleci" : "Standart Stoper", 
+        condition: fallbackConditions[Math.floor(Math.random() * fallbackConditions.length)], 
+        stats: { pas: dConfig.s.pas, savunma: dConfig.s.savunma, sut: dConfig.s.sut, şut: dConfig.s.sut, dribling: dConfig.s.dribling, firsat: dConfig.s.firsat, fırsat: dConfig.s.firsat, hava: dConfig.s.hava, sutKarsilama: dConfig.s.sutKarsilama||0 }, 
         isTest: true, 
-        secondaryPositions: (p.sec||[]).map(s => ({ pos: s.pos, capacity: s.cap, role: s.role })), 
+        secondaryPositions: (dConfig.sec||[]).map(sConfig => ({ pos: sConfig.pos, capacity: sConfig.cap, role: sConfig.role })), 
         bannedPositions: [] 
     }));
 }
 
-function exportDatabases(e) { 
-    if(e) e.preventDefault(); 
-    const dbs = getDatabases(); 
-    if(Object.keys(dbs).length === 0) return alert("Kayıtlı veritabanı yok!"); 
-    const a = document.createElement('a'); 
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(dbs)], { type: 'application/json' })); 
-    a.download = 'saha_oyuncu_veritabanlari.json'; 
-    document.body.appendChild(a); 
-    a.click(); 
-    document.body.removeChild(a); 
+function exportDatabases(event) { 
+    if(event) event.preventDefault(); 
+    const memoryDatabases = getSavedDatabases(); 
+    if(Object.keys(memoryDatabases).length === 0) return alert("Sistemde dışa aktarılacak kayıtlı bir veritabanı bulunmamaktadır."); 
+    const anchorLink = document.createElement('a'); 
+    anchorLink.href = URL.createObjectURL(new Blob([JSON.stringify(memoryDatabases)], { type: 'application/json' })); 
+    anchorLink.download = 'saha_oyuncu_veritabanlari.json'; 
+    document.body.appendChild(anchorLink); 
+    anchorLink.click(); 
+    document.body.removeChild(anchorLink); 
 }
 
-function importDatabases(e) { 
-    if(e) e.preventDefault(); 
-    const input = document.createElement('input'); 
-    input.type = 'file'; 
-    input.accept = '.json'; 
-    input.onchange = ev => { 
-        const reader = new FileReader(); 
-        reader.onload = readerEvent => { 
+function importDatabases(event) { 
+    if(event) event.preventDefault(); 
+    const fileInputNode = document.createElement('input'); 
+    fileInputNode.type = 'file'; 
+    fileInputNode.accept = '.json'; 
+    fileInputNode.onchange = fileEvent => { 
+        const fileReaderInstance = new FileReader(); 
+        fileReaderInstance.onload = readEventTarget => { 
             try { 
-                JSON.parse(readerEvent.target.result); 
-                localStorage.setItem('football_databases', readerEvent.target.result); 
-                refreshDatabaseSelect(); 
-                alert("Yüklendi."); 
-            } catch { alert("Hata!"); } 
+                JSON.parse(readEventTarget.target.result); 
+                localStorage.setItem('football_databases', readEventTarget.target.result); 
+                refreshDatabaseSelectionMenu(); 
+                alert("Dosya yükleme işlemi başarıyla tamamlandı."); 
+            } catch { alert("Dosya içeriği geçerli bir JSON formatına sahip değil."); } 
         }; 
-        reader.readAsText(ev.target.files[0]); 
+        fileReaderInstance.readAsText(fileEvent.target.files[0]); 
     }; 
-    input.click(); 
+    fileInputNode.click(); 
 }
 
-function getDatabases() { 
+function getSavedDatabases() { 
     try { 
-        const data = localStorage.getItem('football_databases'); 
-        return data ? JSON.parse(data) : {}; 
-    } catch(e) { return {}; } 
+        const memoryDataContent = localStorage.getItem('football_databases'); 
+        return memoryDataContent ? JSON.parse(memoryDataContent) : {}; 
+    } catch(err) { return {}; } 
 }
 
-function setDatabases(dbs) { 
-    localStorage.setItem('football_databases', JSON.stringify(dbs)); 
-    refreshDatabaseSelect(); 
+function applyDatabasesToMemory(dbObjectPayload) { 
+    localStorage.setItem('football_databases', JSON.stringify(dbObjectPayload)); 
+    refreshDatabaseSelectionMenu(); 
 }
 
-function refreshDatabaseSelect() { 
-    const dbs = getDatabases(); 
-    const select = document.getElementById('dbSelect'); 
-    if(!select) return; 
-    select.innerHTML = Object.keys(dbs).length === 0 ? '<option value="">-- Yok --</option>' : Object.keys(dbs).map(k => `<option value="${k}">${k} (${dbs[k].length} Oyuncu)</option>`).join(''); 
+function refreshDatabaseSelectionMenu() { 
+    const memoryDatabases = getSavedDatabases(); 
+    const dbSelectorNode = document.getElementById('dbSelect'); 
+    if(!dbSelectorNode) return; 
+    dbSelectorNode.innerHTML = Object.keys(memoryDatabases).length === 0 ? '<option value="">-- Veri Bulunamadı --</option>' : Object.keys(memoryDatabases).map(keyName => `<option value="${keyName}">${keyName} (${memoryDatabases[keyName].length} Oyuncu)</option>`).join(''); 
 }
 
-function saveNewDatabase(e) { 
-    if (e) e.preventDefault(); 
-    if (!currentPlayers.length) return alert("Oyuncu yok!"); 
-    const dbName = prompt("İsim:"); 
-    if (!dbName) return; 
-    const dbs = getDatabases(); 
-    dbs[dbName] = currentPlayers; 
-    setDatabases(dbs); 
-    document.getElementById('dbSelect').value = dbName; 
-    localStorage.setItem('last_used_db', dbName); 
+function saveNewDatabase(event) { 
+    if (event) event.preventDefault(); 
+    if (!currentPlayers.length) return alert("Havuza kaydedilecek herhangi bir oyuncu bulunmamaktadır."); 
+    const generatedDbName = prompt("Oluşturulacak yeni havuzun adını giriniz:"); 
+    if (!generatedDbName) return; 
+    const memoryDatabases = getSavedDatabases(); 
+    memoryDatabases[generatedDbName] = currentPlayers; 
+    applyDatabasesToMemory(memoryDatabases); 
+    document.getElementById('dbSelect').value = generatedDbName; 
+    localStorage.setItem('last_used_db', generatedDbName); 
 }
 
-function loadDatabase(e) { 
-    if (e) e.preventDefault(); 
-    const dbName = document.getElementById('dbSelect')?.value; 
-    if (!dbName) return; 
-    const dbs = getDatabases(); 
-    if(dbs[dbName]) { 
-        currentPlayers = [...currentPlayers, ...dbs[dbName].map((p, i) => { 
-            let n = {...p, id: Date.now() + i + Math.random()}; 
-            if (!n.bannedPositions) n.bannedPositions = []; 
-            return n; 
+function loadDatabase(event) { 
+    if (event) event.preventDefault(); 
+    const targetDbName = document.getElementById('dbSelect')?.value; 
+    if (!targetDbName) return; 
+    const memoryDatabases = getSavedDatabases(); 
+    if(memoryDatabases[targetDbName]) { 
+        currentPlayers = [...currentPlayers, ...memoryDatabases[targetDbName].map((p, index) => { 
+            let mappedPlayer = {...p, id: Date.now() + index + Math.random()}; 
+            if (!mappedPlayer.bannedPositions) mappedPlayer.bannedPositions = []; 
+            return mappedPlayer; 
         })]; 
         chartInstances = {}; 
         updatePlayerList(); 
         renderPositionMap(); 
-        alert(`"${dbName}" eklendi.`); 
-        localStorage.setItem('last_used_db', dbName); 
+        alert(`"${targetDbName}" adlı havuz mevcut listeye başarıyla aktarıldı.`); 
+        localStorage.setItem('last_used_db', targetDbName); 
     } 
 }
 
-function updateDatabase(e) { 
-    if (e) e.preventDefault(); 
-    const dbName = document.getElementById('dbSelect')?.value; 
-    if (!dbName) return; 
-    const dbs = getDatabases(); 
-    dbs[dbName] = currentPlayers; 
-    setDatabases(dbs); 
-    alert(`Güncellendi.`); 
-    localStorage.setItem('last_used_db', dbName); 
+function updateDatabase(event) { 
+    if (event) event.preventDefault(); 
+    const targetDbName = document.getElementById('dbSelect')?.value; 
+    if (!targetDbName) return; 
+    const memoryDatabases = getSavedDatabases(); 
+    memoryDatabases[targetDbName] = currentPlayers; 
+    applyDatabasesToMemory(memoryDatabases); 
+    alert(`Veritabanı başarıyla güncellendi.`); 
+    localStorage.setItem('last_used_db', targetDbName); 
 }
 
-function deleteDatabase(e) { 
-    if (e) e.preventDefault(); 
-    const dbName = document.getElementById('dbSelect')?.value; 
-    if (!dbName) return; 
-    if (confirm(`Silinsin mi?`)) { 
-        const dbs = getDatabases(); 
-        delete dbs[dbName]; 
-        setDatabases(dbs); 
-        if (localStorage.getItem('last_used_db') === dbName) localStorage.removeItem('last_used_db'); 
+function deleteDatabase(event) { 
+    if (event) event.preventDefault(); 
+    const targetDbName = document.getElementById('dbSelect')?.value; 
+    if (!targetDbName) return; 
+    if (confirm(`İlgili veritabanı kaydını kalıcı olarak silmek istediğinize emin misiniz?`)) { 
+        const memoryDatabases = getSavedDatabases(); 
+        delete memoryDatabases[targetDbName]; 
+        applyDatabasesToMemory(memoryDatabases); 
+        if (localStorage.getItem('last_used_db') === targetDbName) localStorage.removeItem('last_used_db'); 
     } 
 }
 
-function selectRandomPlayers(e) { 
-    if (e) e.preventDefault(); 
-    const format = Number(document.getElementById('matchFormat')?.value || 7); 
-    const req = format * 2; 
-    if (currentPlayers.length < req) return alert(`En az ${req} gerekli.`); 
+function selectRandomPlayers(event) { 
+    if (event) event.preventDefault(); 
+    const formatConfiguration = Number(document.getElementById('matchFormat')?.value || 7); 
+    const requiredPlayerCount = formatConfiguration * 2; 
+    if (currentPlayers.length < requiredPlayerCount) return alert(`İşlemin gerçekleşmesi için havuzda en az ${requiredPlayerCount} aktif oyuncu bulunmalıdır.`); 
     
     currentPlayers.forEach(p => p.selected = false); 
-    const gks = currentPlayers.filter(p => p.mainPos === 'GK').sort(() => Math.random() - 0.5); 
-    const fields = currentPlayers.filter(p => p.mainPos !== 'GK').sort(() => Math.random() - 0.5); 
+    const goalkeeperList = currentPlayers.filter(p => p.mainPos === 'GK').sort(() => Math.random() - 0.5); 
+    const fieldPlayerList = currentPlayers.filter(p => p.mainPos !== 'GK').sort(() => Math.random() - 0.5); 
     
-    let count = 0; 
-    if (gks.length >= 2) { 
-        gks[0].selected = true; 
-        gks[1].selected = true; 
-        count += 2; 
+    let activeSelectionCount = 0; 
+    if (goalkeeperList.length >= 2) { 
+        goalkeeperList[0].selected = true; 
+        goalkeeperList[1].selected = true; 
+        activeSelectionCount += 2; 
     } else { 
-        gks.forEach(gk => { gk.selected = true; count++; }); 
+        goalkeeperList.forEach(gk => { gk.selected = true; activeSelectionCount++; }); 
     } 
     
-    for(let i=0; i<fields.length && count < req; i++) { 
-        fields[i].selected = true; 
-        count++; 
+    for(let i=0; i<fieldPlayerList.length && activeSelectionCount < requiredPlayerCount; i++) { 
+        fieldPlayerList[i].selected = true; 
+        activeSelectionCount++; 
     } 
     updatePlayerList(); 
 }
 
 function getOvrForPosition(player, pos, role, capacity, applyCondition = false) {
-    const basePos = getBasePosition(pos);
-    if (player.bannedPositions && player.bannedPositions.includes(basePos)) return 0;
+    const basePosName = getBasePosition(pos);
+    if (player.bannedPositions && player.bannedPositions.includes(basePosName)) return 0;
     
-    const weights = ROLE_WEIGHTS[basePos]?.[role];
-    const getStat = s => player.stats[s] ?? (s === 'sut' ? player.stats.şut : s === 'firsat' ? player.stats.fırsat : 0);
-    const condMulti = applyCondition ? (CONDITIONS[player.condition] || 1.0) : 1.0;
+    const weightsConfig = ROLE_WEIGHTS[basePosName]?.[role];
+    const acquireStat = statTarget => player.stats[statTarget] ?? (statTarget === 'sut' ? player.stats.şut : statTarget === 'firsat' ? player.stats.fırsat : 0);
+    const conditionalMultiplier = applyCondition ? (CONDITIONS[player.condition] || 1.0) : 1.0;
     
-    let baseOvr = 0;
+    let baseCalculatedOvr = 0;
     
-    if (weights) {
-        let ts = 0, tw = 0;
-        for (const [s, w] of Object.entries(weights)) { 
-            if (w > 0) { 
-                let currentCond = condMulti;
-                if (basePos === 'GK' && !['savunma', 'dribling', 'hava'].includes(s)) {
-                    currentCond = 1.0;
+    if (weightsConfig) {
+        let totalScoreCalculation = 0, totalWeightAccumulation = 0;
+        for (const [statRef, weightRef] of Object.entries(weightsConfig)) { 
+            if (weightRef > 0) { 
+                let currentConditionStatus = conditionalMultiplier;
+                if (basePosName === 'GK' && !['savunma', 'dribling', 'hava'].includes(statRef)) {
+                    currentConditionStatus = 1.0;
                 }
-                ts += (getStat(s) * currentCond) * w; 
-                tw += w; 
+                totalScoreCalculation += (acquireStat(statRef) * currentConditionStatus) * weightRef; 
+                totalWeightAccumulation += weightRef; 
             } 
         }
-        if (tw > 0) baseOvr = Math.round(ts / tw);
+        if (totalWeightAccumulation > 0) baseCalculatedOvr = Math.round(totalScoreCalculation / totalWeightAccumulation);
     } else {
-        let sSut = basePos === 'GK' ? player.stats.sutKarsilama || 0 : getStat('sut');
-        baseOvr = Math.round(((player.stats.pas || 0)*condMulti + (player.stats.savunma || 0)*condMulti + (player.stats.dribling || 0)*condMulti + (player.stats.hava || 0)*condMulti + getStat('firsat')*condMulti + sSut*condMulti) / 6);
+        let derivedSutData = basePosName === 'GK' ? player.stats.sutKarsilama || 0 : acquireStat('sut');
+        baseCalculatedOvr = Math.round(((player.stats.pas || 0)*conditionalMultiplier + (player.stats.savunma || 0)*conditionalMultiplier + (player.stats.dribling || 0)*conditionalMultiplier + (player.stats.hava || 0)*conditionalMultiplier + acquireStat('firsat')*conditionalMultiplier + derivedSutData*conditionalMultiplier) / 6);
     }
     
-    return Math.round(baseOvr * (capacity / 100));
+    return Math.round(baseCalculatedOvr * (capacity / 100));
 }
 
 function getEffectivePlayerInfo(player, applyCondition = false) {
-    const mainPos = player.mainPos;
-    const mainBase = getBasePosition(mainPos);
-    const banned = player.bannedPositions || [];
-    const isMainBanned = banned.includes(mainPos) || banned.includes(mainBase);
+    const activeMainPosition = player.mainPos;
+    const activeMainBase = getBasePosition(activeMainPosition);
+    const currentBannedList = player.bannedPositions || [];
+    const mainPosIsBannedStatus = currentBannedList.includes(activeMainPosition) || currentBannedList.includes(activeMainBase);
 
-    let activeRole = player.role;
-    if (!activeRole || activeRole === 'null') activeRole = getBestRoleForStats(mainBase, player.stats);
+    let activeFunctionalRole = player.role;
+    if (!activeFunctionalRole || activeFunctionalRole === 'null') activeFunctionalRole = getBestRoleForStats(activeMainBase, player.stats);
 
-    if (!isMainBanned) {
+    if (!mainPosIsBannedStatus) {
         return { 
-            original: mainPos, 
-            active: mainPos, 
-            activeRole: activeRole, 
-            ovr: getOvrForPosition(player, mainPos, activeRole, 100, applyCondition), 
+            original: activeMainPosition, 
+            active: activeMainPosition, 
+            activeRole: activeFunctionalRole, 
+            ovr: getOvrForPosition(player, activeMainPosition, activeFunctionalRole, 100, applyCondition), 
             isBanned: false 
         };
     }
 
-    let bestSec = null; let bestRole = null; let bestOvr = -1;
+    let optimalSecondaryPos = null; let optimalSecondaryRole = null; let highestPotentialOvr = -1;
     if (player.secondaryPositions && player.secondaryPositions.length > 0) {
-        player.secondaryPositions.forEach(sp => {
-            const spBase = getBasePosition(sp.pos);
-            if (!banned.includes(sp.pos) && !banned.includes(spBase)) {
-                let spRole = sp.role;
-                if (!spRole || spRole === 'null') spRole = getBestRoleForStats(spBase, player.stats);
+        player.secondaryPositions.forEach(secondary => {
+            const secondaryBaseName = getBasePosition(secondary.pos);
+            if (!currentBannedList.includes(secondary.pos) && !currentBannedList.includes(secondaryBaseName)) {
+                let functionalSecondaryRole = secondary.role;
+                if (!functionalSecondaryRole || functionalSecondaryRole === 'null') functionalSecondaryRole = getBestRoleForStats(secondaryBaseName, player.stats);
                 
-                const ovr = getOvrForPosition(player, sp.pos, spRole, sp.capacity, applyCondition);
-                if (ovr > bestOvr) { bestOvr = ovr; bestSec = sp.pos; bestRole = spRole; }
+                const derivedOvr = getOvrForPosition(player, secondary.pos, functionalSecondaryRole, secondary.capacity, applyCondition);
+                if (derivedOvr > highestPotentialOvr) { highestPotentialOvr = derivedOvr; optimalSecondaryPos = secondary.pos; optimalSecondaryRole = functionalSecondaryRole; }
             }
         });
     }
 
-    if (bestSec) return { original: mainPos, active: bestSec, activeRole: bestRole, ovr: bestOvr, isBanned: true };
-    return { original: mainPos, active: 'Yok', activeRole: '-', ovr: 0, isBanned: true };
+    if (optimalSecondaryPos) return { original: activeMainPosition, active: optimalSecondaryPos, activeRole: optimalSecondaryRole, ovr: highestPotentialOvr, isBanned: true };
+    return { original: activeMainPosition, active: 'Yok', activeRole: '-', ovr: 0, isBanned: true };
 }
 
-function getPitchName(player, allPlayers) {
-    if (player.shortName && player.shortName.trim() !== '') return player.shortName.trim();
-    const fName = player.firstName || player.name.split(' ')[0];
-    const lName = player.lastName || player.name.split(' ').slice(1).join(' ');
-    const duplicates = allPlayers.filter(p => (p.firstName || p.name.split(' ')[0]).toLowerCase() === fName.toLowerCase());
-    if (duplicates.length > 1 && lName && lName.trim() !== '') return `${fName} ${lName.trim().charAt(0)}.`;
-    return fName;
-}
-
-function openPlayerModal(info) {
-    const condMulti = CONDITIONS[info.cond] || 1.0;
-    const statLabels = { 'pas': 'Pas D.', 'savunma': 'Sav', 'sut': 'Şut', 'dribling': 'Dribling', 'firsat': 'Fırsat Y.', 'hava': 'Hava', 'sutKarsilama': 'Şut Karşılama' };
+function getPitchName(player, allAvailablePlayers) {
+    let finalName = '';
     
-    let detailsHtml = `
+    if (player.shortName && player.shortName.trim() !== '') {
+        finalName = player.shortName.trim();
+    } else {
+        const primaryName = player.firstName || player.name.split(' ')[0];
+        const surName = player.lastName || player.name.split(' ').slice(1).join(' ');
+        const potentialDuplicates = allAvailablePlayers.filter(p => (p.firstName || p.name.split(' ')[0]).toLowerCase() === primaryName.toLowerCase());
+        
+        if (potentialDuplicates.length > 1 && surName && surName.trim() !== '') {
+            finalName = `${primaryName} ${surName.trim().charAt(0)}.`;
+        } else {
+            finalName = primaryName;
+        }
+    }
+    
+    // Düzenli ifade (Regex) ile parantez içindeki kelimeleri bulur ve aralarındaki boşluğu bölünmez boşluğa çevirir.
+    return finalName.replace(/\(([^)]+)\)/g, match => match.replace(/ /g, '\u00A0'));
+}
+
+function openPlayerDetailModal(playerDataInfo) {
+    const condMultiplierStatus = CONDITIONS[playerDataInfo.cond] || 1.0;
+    const readableStatLabels = { 'pas': 'Pas D.', 'savunma': 'Sav', 'sut': 'Şut', 'dribling': 'Dribling', 'firsat': 'Fırsat Y.', 'hava': 'Hava', 'sutKarsilama': 'Şut Karşılama' };
+    
+    let generatedDetailsHtml = `
         <div style="padding:15px; border-radius:6px; margin-bottom:15px; font-size:1.05em; background: var(--bg-detail); color: var(--text-main); border: 1px solid var(--border-color);">
-            <b>Mevki:</b> ${info.basePos} | 
-            <b>Rol:</b> <span style="color:#2ecc71;">${info.role}</span> <br>
-            <b>Mevki Kapasitesi:</b> <span style="color:${info.cap===100?'#2ecc71':(info.cap>50?'#f39c12':'#e74c3c')};">%${info.cap}</span> | 
-            <b>Kondisyon:</b> <span style="margin-right:5px;">${getConditionHeart(info.cond)}</span> ${info.cond} (Çarpan: x${condMulti})
+            <b>Mevki:</b> ${playerDataInfo.basePos} | 
+            <b>Rol:</b> <span style="color:#2ecc71;">${playerDataInfo.role}</span> <br>
+            <b>Mevki Kapasitesi:</b> <span style="color:${playerDataInfo.cap===100?'#2ecc71':(playerDataInfo.cap>50?'#f39c12':'#e74c3c')};">%${playerDataInfo.cap}</span> | 
+            <b>Kondisyon:</b> <span style="margin-right:5px;">${getConditionHeart(playerDataInfo.cond)}</span> ${playerDataInfo.cond} (Çarpan: x${condMultiplierStatus})
         </div>
         <div style="font-weight:bold; color:#f39c12; margin-bottom:10px;">Takım Dengesine Bireysel Katkı Analizi:</div>
         <table class="sim-stat-table" style="width:100%; text-align:left; border-collapse:collapse; font-size:0.95em;">
@@ -897,47 +943,47 @@ function openPlayerModal(info) {
             </tr>
     `;
     
-    let totalContrib = 0;
-    const keys = info.basePos === 'GK' ? ['pas', 'savunma', 'sutKarsilama', 'dribling', 'firsat', 'hava'] : ['pas', 'savunma', 'sut', 'dribling', 'firsat', 'hava'];
+    let absoluteTotalContribution = 0;
+    const operationalKeys = playerDataInfo.basePos === 'GK' ? ['pas', 'savunma', 'sutKarsilama', 'dribling', 'firsat', 'hava'] : ['pas', 'savunma', 'sut', 'dribling', 'firsat', 'hava'];
     
-    keys.forEach(stat => {
-        const weight = info.weights[stat] || 0;
-        let raw = info.stats[stat] !== undefined ? info.stats[stat] : 0;
+    operationalKeys.forEach(statKey => {
+        const attributeWeight = playerDataInfo.weights[statKey] || 0;
+        let attributeRawValue = playerDataInfo.stats[statKey] !== undefined ? playerDataInfo.stats[statKey] : 0;
         
-        if (stat === 'sut' && raw === 0) raw = info.stats['şut'] || 0;
-        if (stat === 'firsat' && raw === 0) raw = info.stats['fırsat'] || 0;
+        if (statKey === 'sut' && attributeRawValue === 0) attributeRawValue = playerDataInfo.stats['şut'] || 0;
+        if (statKey === 'firsat' && attributeRawValue === 0) attributeRawValue = playerDataInfo.stats['fırsat'] || 0;
 
-        const isExempt = info.basePos === 'GK' && !['savunma', 'dribling', 'hava'].includes(stat);
-        const currentCondMulti = isExempt ? 1.0 : condMulti;
+        const bypassConditionFactor = playerDataInfo.basePos === 'GK' && !['savunma', 'dribling', 'hava'].includes(statKey);
+        const dynamicConditionMultiplier = bypassConditionFactor ? 1.0 : condMultiplierStatus;
         
-        const effective = raw * (weight/100) * (info.cap/100) * currentCondMulti;
-        totalContrib += effective;
+        const validatedContribution = attributeRawValue * (attributeWeight/100) * (playerDataInfo.cap/100) * dynamicConditionMultiplier;
+        absoluteTotalContribution += validatedContribution;
         
-        const statName = statLabels[stat] || stat;
+        const displayLabel = readableStatLabels[statKey] || statKey;
         
-        const shieldNote = (isExempt && condMulti !== 1.0 && weight > 0) ? `<br><span style="font-size:0.7em; color:#f39c12;">(Kondisyondan Etkilenmez)</span>` : ``;
-        const rowStyle = weight === 0 ? "opacity: 0.5;" : "";
+        const exemptionNotification = (bypassConditionFactor && condMultiplierStatus !== 1.0 && attributeWeight > 0) ? `<br><span style="font-size:0.7em; color:#f39c12;">(Kondisyondan Etkilenmez)</span>` : ``;
+        const renderingRowStyle = attributeWeight === 0 ? "opacity: 0.5;" : "";
 
-        detailsHtml += `<tr style="${rowStyle}">
-            <td style="padding:8px; font-weight:bold;">${statName}</td>
-            <td style="padding:8px; font-weight:bold; text-align:center;">${raw}</td>
-            <td style="padding:8px; color:var(--text-muted);">%${weight}</td>
-            <td style="padding:8px; color:#2ecc71; font-weight:bold;">+${effective.toFixed(1)}${shieldNote}</td>
+        generatedDetailsHtml += `<tr style="${renderingRowStyle}">
+            <td style="padding:8px; font-weight:bold;">${displayLabel}</td>
+            <td style="padding:8px; font-weight:bold; text-align:center;">${attributeRawValue}</td>
+            <td style="padding:8px; color:var(--text-muted);">%${attributeWeight}</td>
+            <td style="padding:8px; color:#2ecc71; font-weight:bold;">+${validatedContribution.toFixed(1)}${exemptionNotification}</td>
         </tr>`;
     });
 
-    detailsHtml += `</table>
+    generatedDetailsHtml += `</table>
     <div style="margin-top:20px; display:flex; justify-content:space-between; align-items:center;">
-        <div style="font-size:1.2em; font-weight: bold;">Toplam OVR Katkısı: <b style="color:#27ae60; font-size:1.3em;">${totalContrib.toFixed(1)}</b></div>
+        <div style="font-size:1.2em; font-weight: bold;">Toplam OVR Katkısı: <b style="color:#27ae60; font-size:1.3em;">${absoluteTotalContribution.toFixed(1)}</b></div>
     </div>`;
     
-    document.getElementById('modalTitle').innerText = info.name + " (" + info.pOvr + " OVR)";
-    document.getElementById('modalBody').innerHTML = detailsHtml;
+    document.getElementById('modalTitle').innerText = playerDataInfo.name + " (" + playerDataInfo.pOvr + " OVR)";
+    document.getElementById('modalBody').innerHTML = generatedDetailsHtml;
     document.getElementById('playerModal').style.display = 'flex';
 }
 
-function generateMiniPitchHTML(player, width = "140px") {
-    const baseSlotCoords = { 
+function generateMiniPitchHTML(playerContext, containerWidth = "140px") {
+    const positionLayoutData = { 
         "FW": {x: 50, y: 12}, "LW": {x: 10, y: 27}, "AM": {x: 50, y: 27}, "RW": {x: 90, y: 27}, 
         "LM": {x: 10, y: 42}, "CM": {x: 50, y: 42}, "RM": {x: 90, y: 42}, 
         "LWB": {x: 10, y: 57}, "DM": {x: 50, y: 57}, "RWB": {x: 90, y: 57}, 
@@ -945,130 +991,130 @@ function generateMiniPitchHTML(player, width = "140px") {
         "GK": {x: 50, y: 87} 
     };
     
-    let nodesHTML = '';
-    const mainPos = getBasePosition(player.mainPos);
-    let mainRole = player.role;
-    if (!mainRole || mainRole === 'null') mainRole = getBestRoleForStats(mainPos, player.stats);
+    let renderedNodesHTML = '';
+    const originPositionBase = getBasePosition(playerContext.mainPos);
+    let functionalMainRole = playerContext.role;
+    if (!functionalMainRole || functionalMainRole === 'null') functionalMainRole = getBestRoleForStats(originPositionBase, playerContext.stats);
     
-    const secPositions = player.secondaryPositions || [];
-    const bannedPositions = player.bannedPositions || [];
-    const pid = player.id || ''; 
-    const clickClass = pid ? 'pitch-node-clickable' : ''; 
+    const contextSecondaryPositions = playerContext.secondaryPositions || [];
+    const contextBannedPositions = playerContext.bannedPositions || [];
+    const internalPlayerId = playerContext.id || ''; 
+    const interactionClassFlag = internalPlayerId ? 'pitch-node-clickable' : ''; 
 
-    Object.keys(baseSlotCoords).forEach(pos => {
-        const isMain = mainPos === pos;
-        const secObj = secPositions.find(sp => getBasePosition(sp.pos) === pos);
-        const isSec = !!secObj;
-        const isBanned = bannedPositions.includes(pos);
+    Object.keys(positionLayoutData).forEach(iteratingPos => {
+        const isCurrentlyMain = originPositionBase === iteratingPos;
+        const matchingSecondaryInfo = contextSecondaryPositions.find(sp => getBasePosition(sp.pos) === iteratingPos);
+        const isCurrentlySecondary = !!matchingSecondaryInfo;
+        const isCurrentlyBanned = contextBannedPositions.includes(iteratingPos);
 
-        let bgColor, border, content, size, zIndex, opacity, tooltipText;
+        let activeBackground, activeBorder, displayContent, structuralSize, depthIndex, structuralOpacity, tooltipStringData;
 
-        if (isBanned) {
-            bgColor = '#c0392b'; border = '1px solid white'; content = 'X'; size = 20; zIndex = 10; opacity = 1;
-            tooltipText = `<b>${pos}</b> <span style="color:#e74c3c;">(Yasaklı)</span>`;
-        } else if (isMain) {
-            const ovr = getOvrForPosition(player, pos, mainRole, 100, false);
-            bgColor = '#00d2d3'; border = '2px solid white'; content = pos; size = 24; zIndex = 8; opacity = 1;
-            tooltipText = `<b>${pos} (Ana)</b><br><span style="color:#f39c12;">${mainRole}</span><br><span style="color:${getStatColor(ovr)};">${ovr} OVR</span>`;
-        } else if (isSec) {
-            let sRole = secObj.role;
-            if (!sRole || sRole === 'null') sRole = getBestRoleForStats(pos, player.stats);
-            const ovr = getOvrForPosition(player, pos, sRole, secObj.capacity, false);
-            bgColor = secObj.capacity === 100 ? '#00d2d3' : `hsl(${Math.floor((secObj.capacity / 100) * 120)}, 80%, 45%)`;
-            border = '1px solid white'; content = pos; size = 20; zIndex = 7; opacity = 1;
-            tooltipText = `<b>${pos} (Yan) - %${secObj.capacity}</b><br><span style="color:#f39c12;">${sRole}</span><br><span style="color:${getStatColor(ovr)};">${ovr} OVR</span>`;
+        if (isCurrentlyBanned) {
+            activeBackground = '#c0392b'; activeBorder = '1px solid white'; displayContent = 'X'; structuralSize = 20; depthIndex = 10; structuralOpacity = 1;
+            tooltipStringData = `<b>${iteratingPos}</b> <span style="color:#e74c3c;">(Yasaklı)</span>`;
+        } else if (isCurrentlyMain) {
+            const runtimeOvr = getOvrForPosition(playerContext, iteratingPos, functionalMainRole, 100, false);
+            activeBackground = '#00d2d3'; activeBorder = '2px solid white'; displayContent = iteratingPos; structuralSize = 24; depthIndex = 8; structuralOpacity = 1;
+            tooltipStringData = `<b>${iteratingPos} (Ana)</b><br><span style="color:#f39c12;">${functionalMainRole}</span><br><span style="color:${getStatColor(runtimeOvr)};">${runtimeOvr} OVR</span>`;
+        } else if (isCurrentlySecondary) {
+            let contextualSecRole = matchingSecondaryInfo.role;
+            if (!contextualSecRole || contextualSecRole === 'null') contextualSecRole = getBestRoleForStats(iteratingPos, playerContext.stats);
+            const runtimeOvr = getOvrForPosition(playerContext, iteratingPos, contextualSecRole, matchingSecondaryInfo.capacity, false);
+            activeBackground = matchingSecondaryInfo.capacity === 100 ? '#00d2d3' : `hsl(${Math.floor((matchingSecondaryInfo.capacity / 100) * 120)}, 80%, 45%)`;
+            activeBorder = '1px solid white'; displayContent = iteratingPos; structuralSize = 20; depthIndex = 7; structuralOpacity = 1;
+            tooltipStringData = `<b>${iteratingPos} (Yan) - %${matchingSecondaryInfo.capacity}</b><br><span style="color:#f39c12;">${contextualSecRole}</span><br><span style="color:${getStatColor(runtimeOvr)};">${runtimeOvr} OVR</span>`;
         } else {
-            bgColor = 'rgba(255,255,255,0.1)'; border = '1px dashed rgba(255,255,255,0.4)'; content = ''; size = 16; zIndex = 5; opacity = 0.6;
-            tooltipText = `<b>${pos}</b><br><span style="color:var(--text-muted);">(Kapat)</span>`;
+            activeBackground = 'rgba(255,255,255,0.1)'; activeBorder = '1px dashed rgba(255,255,255,0.4)'; displayContent = ''; structuralSize = 16; depthIndex = 5; structuralOpacity = 0.6;
+            tooltipStringData = `<b>${iteratingPos}</b><br><span style="color:var(--text-muted);">(Kapat)</span>`;
         }
 
-        nodesHTML += `
-        <div class="custom-tooltip ${clickClass}" data-pid="${pid}" data-pos="${pos}" style="position: absolute; left: ${baseSlotCoords[pos].x}%; top: ${baseSlotCoords[pos].y}%; transform: translate(-50%, -50%); width: ${size}px; height: ${size}px; border-radius: 50%; background-color: ${bgColor}; border: ${border}; box-shadow: 0 2px 4px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 0.5em; font-weight: bold; color: ${isBanned ? 'white' : 'black'}; z-index: ${zIndex}; opacity: ${opacity}; transition: all 0.15s ease;">
-            ${content}
-            <span class="tooltip-text">${tooltipText}</span>
+        renderedNodesHTML += `
+        <div class="custom-tooltip ${interactionClassFlag}" data-pid="${internalPlayerId}" data-pos="${iteratingPos}" style="position: absolute; left: ${positionLayoutData[iteratingPos].x}%; top: ${positionLayoutData[iteratingPos].y}%; transform: translate(-50%, -50%); width: ${structuralSize}px; height: ${structuralSize}px; border-radius: 50%; background-color: ${activeBackground}; border: ${activeBorder}; box-shadow: 0 2px 4px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 0.5em; font-weight: bold; color: ${isCurrentlyBanned ? 'white' : 'black'}; z-index: ${depthIndex}; opacity: ${structuralOpacity}; transition: all 0.15s ease;">
+            ${displayContent}
+            <span class="tooltip-text">${tooltipStringData}</span>
         </div>`;
     });
 
     return `
-        <div style="position: relative; width: ${width}; max-width: 100%; aspect-ratio: 1/1.7; background: transparent; border: 2px solid rgba(255,255,255,0.7); border-radius: 4px; box-shadow: inset 0 0 10px rgba(0,0,0,0.3);">
+        <div style="position: relative; width: ${containerWidth}; max-width: 100%; aspect-ratio: 1/1.7; background: transparent; border: 2px solid rgba(255,255,255,0.7); border-radius: 4px; box-shadow: inset 0 0 10px rgba(0,0,0,0.3);">
             <div style="position: absolute; top: 0; left: 20%; width: 60%; height: 16%; border: 1px solid rgba(255,255,255,0.4); border-top: none;"></div>
             <div style="position: absolute; bottom: 0; left: 20%; width: 60%; height: 16%; border: 1px solid rgba(255,255,255,0.4); border-bottom: none;"></div>
             <div style="position: absolute; top: 50%; left: 0; width: 100%; height: 1px; background: rgba(255,255,255,0.4); transform: translateY(-50%);"></div>
             <div style="position: absolute; top: 50%; left: 50%; width: 40px; height: 40px; border: 1px solid rgba(255,255,255,0.4); border-radius: 50%; transform: translate(-50%, -50%);"></div>
-            ${nodesHTML}
+            ${renderedNodesHTML}
         </div>`;
 }
 
-function generateTacticalPitchHTML(lineup, title, teamColor = '#00d2d3', teamType = 'A', cardIndex = 0) {
-    if (!lineup) return '';
+function generateTacticalPitchHTML(lineupData, interfaceTitle, specifiedTeamColor = '#00d2d3', teamIdentifier = 'A', cardSequenceIndex = 0) {
+    if (!lineupData) return '';
     
-    const useTeamColors = document.getElementById('cbTeamColors')?.checked;
-
-    const slotCoords = { 
-        "LFW": {x: 20, y: 12}, "FW": {x: 50, y: 12}, "RFW": {x: 80, y: 12}, 
-        "LW": {x: 10, y: 27}, "LAM": {x: 30, y: 27}, "AM": {x: 50, y: 27}, "RAM": {x: 70, y: 27}, "RW": {x: 90, y: 27}, 
-        "LM": {x: 10, y: 42}, "LCM": {x: 30, y: 42}, "CM": {x: 50, y: 42}, "RCM": {x: 70, y: 42}, "RM": {x: 90, y: 42}, 
-        "LWB": {x: 10, y: 57}, "LDM": {x: 30, y: 57}, "DM": {x: 50, y: 57}, "RDM": {x: 70, y: 57}, "RWB": {x: 90, y: 57}, 
+    const configurationUsesTeamColors = document.getElementById('cbTeamColors')?.checked;
+    
+    const targetSlotCoordinates = { 
+        "LFW": {x: 20, y: 8}, "FW": {x: 50, y: 8}, "RFW": {x: 80, y: 8}, 
+        "LW": {x: 10, y: 24}, "LAM": {x: 30, y: 24}, "AM": {x: 50, y: 24}, "RAM": {x: 70, y: 24}, "RW": {x: 90, y: 24}, 
+        "LM": {x: 10, y: 40}, "LCM": {x: 30, y: 40}, "CM": {x: 50, y: 40}, "RCM": {x: 70, y: 40}, "RM": {x: 90, y: 40}, 
+        "LWB": {x: 10, y: 56}, "LDM": {x: 30, y: 56}, "DM": {x: 50, y: 56}, "RDM": {x: 70, y: 56}, "RWB": {x: 90, y: 56}, 
         "LB": {x: 10, y: 72}, "LCB": {x: 30, y: 72}, "CB": {x: 50, y: 72}, "RCB": {x: 70, y: 72}, "RB": {x: 90, y: 72}, 
-        "GK": {x: 50, y: 87} 
+        "GK": {x: 50, y: 88} 
     };
     
-    let playersHTML = '';
+    let constructedPlayersHTML = '';
     
-    Object.keys(slotCoords).forEach(slotKey => {
-        const posData = slotCoords[slotKey];
-        const item = lineup.lineup.find(i => i.slot === slotKey);
+    Object.keys(targetSlotCoordinates).forEach(slotReferenceKey => {
+        const correspondingPositionData = targetSlotCoordinates[slotReferenceKey];
+        const assignedItemContext = lineupData.lineup.find(itemObj => itemObj.slot === slotReferenceKey);
 
-        if (item && item.player) {
-            let effectiveRole = item.role;
-            if (!effectiveRole || effectiveRole === 'null') effectiveRole = getBestRoleForStats(item.basePos, item.player.stats);
+        if (assignedItemContext && assignedItemContext.player) {
+            let activePlayingRole = assignedItemContext.role;
+            if (!activePlayingRole || activePlayingRole === 'null') activePlayingRole = getBestRoleForStats(assignedItemContext.basePos, assignedItemContext.player.stats);
             
-            const activeOvr = getOvrForPosition(item.player, item.slot, effectiveRole, item.cap, true);
-            const weights = ROLE_WEIGHTS[item.basePos]?.[effectiveRole] || {};
-            const pinfo = { cond: item.player.condition, basePos: item.basePos, role: effectiveRole, cap: item.cap, weights: weights, stats: item.player.stats, name: item.player.name, pOvr: item.pOvr };
-            const encodedInfo = encodeURIComponent(JSON.stringify(pinfo));
+            const realTimeOvr = getOvrForPosition(assignedItemContext.player, assignedItemContext.slot, activePlayingRole, assignedItemContext.cap, true);
+            const definedWeightsProfile = ROLE_WEIGHTS[assignedItemContext.basePos]?.[activePlayingRole] || {};
+            const playerInterfaceInfo = { cond: assignedItemContext.player.condition, basePos: assignedItemContext.basePos, role: activePlayingRole, cap: assignedItemContext.cap, weights: definedWeightsProfile, stats: assignedItemContext.player.stats, name: assignedItemContext.player.name, pOvr: assignedItemContext.pOvr };
+            const encodedPlayerInterfaceInfo = encodeURIComponent(JSON.stringify(playerInterfaceInfo));
             
-            let circleColor = teamColor; 
-            let warningIcon = '';
+            let primaryCircleColor = specifiedTeamColor; 
+            let warningSystemIcon = '';
 
-            if (item.outOfPos) { 
-                warningIcon = `<div class="pitch-player-alert" style="position:absolute; top:-8px; right:-8px; font-size:16px; text-shadow: 1px 1px 2px #000; z-index: 10;">⚠️</div>`; 
-                circleColor = '#e74c3c'; 
-            } else if (useTeamColors) {
-                circleColor = teamType === 'A' ? '#3498db' : '#e74c3c'; 
+            if (assignedItemContext.outOfPos) { 
+                warningSystemIcon = `<div class="pitch-player-alert" style="position:absolute; top:-8px; right:-8px; font-size:16px; text-shadow: 1px 1px 2px #000; z-index: 10;">⚠️</div>`; 
+                primaryCircleColor = '#e74c3c'; 
+            } else if (configurationUsesTeamColors) {
+                primaryCircleColor = teamIdentifier === 'A' ? '#3498db' : '#e74c3c'; 
             } else {
-                if (item.isMain || (item.isSec && item.cap === 100)) { circleColor = '#00d2d3'; } 
-                else if (item.isSec) { circleColor = `hsl(${Math.floor(((item.cap || 50) / 100) * 120)}, 80%, 45%)`; }
+                if (assignedItemContext.isMain || (assignedItemContext.isSec && assignedItemContext.cap === 100)) { primaryCircleColor = '#00d2d3'; } 
+                else if (assignedItemContext.isSec) { primaryCircleColor = `hsl(${Math.floor(((assignedItemContext.cap || 50) / 100) * 120)}, 80%, 45%)`; }
             }
 
-            const nameColor = item.player.isTest ? '#2ecc71' : 'white';
+            const identifierNameColor = assignedItemContext.player.isTest ? '#2ecc71' : 'white';
             
-            playersHTML += `
-                <div class="pitch-player" draggable="true" data-card="${cardIndex}" data-team="${teamType}" data-slot="${item.slot}" data-pinfo="${encodedInfo}" style="position: absolute; left: ${posData.x}%; top: ${posData.y}%; z-index: 5; cursor: grab; transition: transform 0.15s ease;">
-                    <div class="pitch-player-icon" style="background-color: ${circleColor};">${warningIcon}</div>
-                    <div class="pitch-player-label">
+            // max-content kaldırıldı, width 85px olarak sabitlendi. Alt satıra inmesi sağlandı.
+            constructedPlayersHTML += `
+                <div class="pitch-player" draggable="true" data-card="${cardSequenceIndex}" data-team="${teamIdentifier}" data-slot="${assignedItemContext.slot}" data-pinfo="${encodedPlayerInterfaceInfo}" style="position: absolute; left: ${correspondingPositionData.x}%; top: ${correspondingPositionData.y}%; z-index: 5; cursor: grab; transition: transform 0.15s ease;">
+                    <div class="pitch-player-icon" style="background-color: ${primaryCircleColor};">${warningSystemIcon}</div>
+                    <div class="pitch-player-label" style="width: 85px; text-align: center; margin: 0 auto;">
                         <div style="display: flex; justify-content: center; align-items: baseline; gap: 4px; margin-bottom: 2px;">
-                            <span style="color:#ecf0f1; font-weight:bold; font-size: 0.85em;">${item.slot}</span>
-                            <span class="pitch-ovr-text" style="color:${getStatColor(activeOvr)}; font-weight:bold; font-size: 1.1em; line-height: 1;">${activeOvr}</span>
-                            <span class="cond-icon" style="display: flex; align-items: center;">${getConditionHeart(item.player.condition, 14)}</span>
+                            <span style="color:#ecf0f1; font-weight:bold; font-size: 0.85em;">${assignedItemContext.slot}</span>
+                            <span class="pitch-ovr-text" style="color:${getStatColor(realTimeOvr)}; font-weight:bold; font-size: 1.1em; line-height: 1;">${realTimeOvr}</span>
+                            <span class="cond-icon" style="display: flex; align-items: center;">${getConditionHeart(assignedItemContext.player.condition, 14)}</span>
                         </div>
-                        <div style="white-space: normal; line-height: 1.1; font-size: 0.95em; color:${nameColor}; font-weight: 800;">${getPitchName(item.player, currentPlayers)}</div>
+                        <div style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; overflow-wrap: break-word; line-height: 1.15; font-size: 0.9em; color:${identifierNameColor}; font-weight: 800;">${getPitchName(assignedItemContext.player, currentPlayers)}</div>
                     </div>
                 </div>`;
         } else {
-            playersHTML += `
-                <div class="pitch-empty-slot custom-tooltip" data-card="${cardIndex}" data-team="${teamType}" data-slot="${slotKey}" style="position: absolute; left: ${posData.x}%; top: ${posData.y}%; z-index: 4; width: 36px; height: 36px; transform: translate(-50%, -50%); border: 2px dashed rgba(255,255,255,0.4); border-radius: 50%; background: rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; font-size: 0.9em; font-weight: bold; color: rgba(255,255,255,0.5); transition: opacity 0.2s ease, background 0.2s ease, border-color 0.2s ease;">
-                    
-                    <span class="tooltip-text">${slotKey} (Boş)</span>
+            constructedPlayersHTML += `
+                <div class="pitch-empty-slot custom-tooltip" data-card="${cardSequenceIndex}" data-team="${teamIdentifier}" data-slot="${slotReferenceKey}" style="position: absolute; left: ${correspondingPositionData.x}%; top: ${correspondingPositionData.y}%; z-index: 4; width: 36px; height: 36px; transform: translate(-50%, -50%); border: 2px dashed rgba(255,255,255,0.4); border-radius: 50%; background: rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; font-size: 0.9em; font-weight: bold; color: rgba(255,255,255,0.5); transition: opacity 0.2s ease, background 0.2s ease, border-color 0.2s ease;">
+                    <span class="tooltip-text">${slotReferenceKey} (Boş)</span>
                 </div>`;
         }
     });
 
-    const headerColor = teamType === 'A' ? '#3498db' : '#e74c3c';
+    const definedHeaderColor = teamIdentifier === 'A' ? '#3498db' : '#e74c3c';
 
     return `
         <div class="pitch-container">
-            <h4 class="pitch-title" style="color: ${headerColor}; border-bottom-color: ${headerColor}; margin-top: 0; padding-bottom: 5px;">${title} (${lineup.formationName})</h4>
+            <h4 class="pitch-title" style="color: ${definedHeaderColor}; border-bottom-color: ${definedHeaderColor}; margin-top: 0; padding-bottom: 5px;">${interfaceTitle} (${lineupData.formationName})</h4>
             <div class="pitch-inner">
                 <div style="position: absolute; top: 0; left: 20%; width: 60%; height: 16%; border: 2px solid rgba(255,255,255,0.5); border-top: none;"></div>
                 <div style="position: absolute; top: 0; left: 35%; width: 30%; height: 6%; border: 2px solid rgba(255,255,255,0.5); border-top: none;"></div>
@@ -1077,161 +1123,161 @@ function generateTacticalPitchHTML(lineup, title, teamColor = '#00d2d3', teamTyp
                 <div style="position: absolute; top: 50%; left: 0; width: 100%; height: 2px; background: rgba(255,255,255,0.5); transform: translateY(-50%);"></div>
                 <div style="position: absolute; top: 50%; left: 50%; width: 60px; height: 60px; border: 2px solid rgba(255,255,255,0.5); border-radius: 50%; transform: translate(-50%, -50%);"></div>
                 <div style="position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: rgba(255,255,255,0.5); border-radius: 50%; transform: translate(-50%, -50%);"></div>
-                ${playersHTML}
+                ${constructedPlayersHTML}
             </div>
         </div>`;
 }
 
 function updateLiveRoles() {
-    const statsObj = { 
+    const collectedStatsObj = { 
         pas: Number(document.getElementById('sPas')?.value) || 0, savunma: Number(document.getElementById('sSavunma')?.value) || 0, 
         sut: Number(document.getElementById('sSut')?.value) || 0, dribling: Number(document.getElementById('sDribling')?.value) || 0, 
         firsat: Number(document.getElementById('sFirsat')?.value) || 0, hava: Number(document.getElementById('sHava')?.value) || 0, sutKarsilama: Number(document.getElementById('sSutKar')?.value) || 0 
     };
-    const rawPos = document.getElementById('pMainPos')?.value || 'CB';
-    const mainPos = getBasePosition(rawPos);
-    const secPositions = [];
-    let mainRole = ''; 
+    const rawPosSelection = document.getElementById('pMainPos')?.value || 'CB';
+    const parsedMainPos = getBasePosition(rawPosSelection);
+    const assignedSecPositionsArray = [];
+    let establishedMainRole = ''; 
 
-    const dummyPlayer = { stats: statsObj, condition: document.getElementById('pCond')?.value || "Tam", bannedPositions: [] };
+    const transientDummyPlayer = { stats: collectedStatsObj, condition: document.getElementById('pCond')?.value || "Tam", bannedPositions: [] };
 
-    document.querySelectorAll('.pos-btn-group').forEach(group => {
-        const pos = group.dataset.pos; 
-        const roleSelect = group.querySelector('.role-select');
-        const ovrEl = group.querySelector('.node-ovr');
+    document.querySelectorAll('.pos-btn-group').forEach(btnGroupContainer => {
+        const iterationalPos = btnGroupContainer.dataset.pos; 
+        const innerRoleSelectNode = btnGroupContainer.querySelector('.role-select');
+        const internalOvrLabelNode = btnGroupContainer.querySelector('.node-ovr');
         
-        if (roleSelect && ROLE_WEIGHTS && ROLE_WEIGHTS[pos]) {
-            const bestRole = getBestRoleForStats(pos, statsObj);
+        if (innerRoleSelectNode && ROLE_WEIGHTS && ROLE_WEIGHTS[iterationalPos]) {
+            const calculatedBestRole = getBestRoleForStats(iterationalPos, collectedStatsObj);
             
-            Array.from(roleSelect.options).forEach(opt => { 
-                if(opt.value === bestRole) opt.text = `⭐ ${opt.value}`; 
-                else if(opt.value !== "") opt.text = opt.value; 
+            Array.from(innerRoleSelectNode.options).forEach(optNode => { 
+                if(optNode.value === calculatedBestRole) optNode.text = `⭐ ${optNode.value}`; 
+                else if(optNode.value !== "") optNode.text = optNode.value; 
             });
             
-            const isMain = (pos === mainPos);
-            const isSec = group.classList.contains('active-sec') && !isMain;
+            const isTargetPosMain = (iterationalPos === parsedMainPos);
+            const isTargetPosSec = btnGroupContainer.classList.contains('active-sec') && !isTargetPosMain;
 
-            let activeRole = roleSelect.value || bestRole;
-            let capVal = 0;
+            let validatedActiveRole = innerRoleSelectNode.value || calculatedBestRole;
+            let resultingCapacityVal = 0;
 
-            group.style.backgroundColor = 'var(--bg-panel)'; 
-            group.style.borderColor = 'var(--border-color)'; 
-            const nameEl = group.querySelector('.node-name');
-            if (nameEl) nameEl.style.color = 'var(--text-main)';
+            btnGroupContainer.style.backgroundColor = 'var(--bg-panel)'; 
+            btnGroupContainer.style.borderColor = 'var(--border-color)'; 
+            const iterationalNameLabel = btnGroupContainer.querySelector('.node-name');
+            if (iterationalNameLabel) iterationalNameLabel.style.color = 'var(--text-main)';
 
-            if (isMain) {
-                group.classList.add('main-pos'); group.classList.remove('active-sec');
-                if (group.dataset.manual !== 'true') roleSelect.value = ""; 
-                mainRole = roleSelect.value; roleSelect.style.display = 'block';
-                group.style.backgroundColor = '#00d2d3'; 
-                group.style.borderColor = '#00d2d3'; 
-                capVal = 100;
-                if(nameEl) nameEl.style.color = '#1a252f';
-            } else if (isSec) {
-                group.classList.remove('main-pos');
-                if (group.dataset.manual !== 'true') roleSelect.value = ""; 
-                capVal = Number(group.querySelector('.cap-input').value) || 80;
-                secPositions.push({pos, capacity: capVal, role: roleSelect.value});
-                const secControls = group.querySelector('.sec-controls'); if (secControls) secControls.style.display = 'flex';
+            if (isTargetPosMain) {
+                btnGroupContainer.classList.add('main-pos'); btnGroupContainer.classList.remove('active-sec');
+                if (btnGroupContainer.dataset.manual !== 'true') innerRoleSelectNode.value = ""; 
+                establishedMainRole = innerRoleSelectNode.value; innerRoleSelectNode.style.display = 'block';
+                btnGroupContainer.style.backgroundColor = '#00d2d3'; 
+                btnGroupContainer.style.borderColor = '#00d2d3'; 
+                resultingCapacityVal = 100;
+                if(iterationalNameLabel) iterationalNameLabel.style.color = '#1a252f';
+            } else if (isTargetPosSec) {
+                btnGroupContainer.classList.remove('main-pos');
+                if (btnGroupContainer.dataset.manual !== 'true') innerRoleSelectNode.value = ""; 
+                resultingCapacityVal = Number(btnGroupContainer.querySelector('.cap-input').value) || 80;
+                assignedSecPositionsArray.push({pos: iterationalPos, capacity: resultingCapacityVal, role: innerRoleSelectNode.value});
+                const contextualSecControlsPanel = btnGroupContainer.querySelector('.sec-controls'); if (contextualSecControlsPanel) contextualSecControlsPanel.style.display = 'flex';
                 
-                let hue = Math.floor(((capVal - 25) / 75) * 120);
-                if(hue < 0) hue = 0; if(hue > 120) hue = 120;
-                const dynamicColor = capVal === 100 ? '#00d2d3' : `hsl(${hue}, 80%, 45%)`;
+                let dynamicHueCalc = Math.floor(((resultingCapacityVal - 25) / 75) * 120);
+                if(dynamicHueCalc < 0) dynamicHueCalc = 0; if(dynamicHueCalc > 120) dynamicHueCalc = 120;
+                const evaluatedDynamicColor = resultingCapacityVal === 100 ? '#00d2d3' : `hsl(${dynamicHueCalc}, 80%, 45%)`;
                 
-                group.style.backgroundColor = dynamicColor; 
-                group.style.borderColor = dynamicColor; 
-                if(nameEl) nameEl.style.color = '#1a252f';
+                btnGroupContainer.style.backgroundColor = evaluatedDynamicColor; 
+                btnGroupContainer.style.borderColor = evaluatedDynamicColor; 
+                if(iterationalNameLabel) iterationalNameLabel.style.color = '#1a252f';
             } else { 
-                group.classList.remove('main-pos', 'active-sec');
-                const secControls = group.querySelector('.sec-controls'); if (secControls) secControls.style.display = 'none';
+                btnGroupContainer.classList.remove('main-pos', 'active-sec');
+                const contextualSecControlsPanel = btnGroupContainer.querySelector('.sec-controls'); if (contextualSecControlsPanel) contextualSecControlsPanel.style.display = 'none';
             }
 
-            if (isMain || isSec) {
-                let ovr = getOvrForPosition(dummyPlayer, pos, activeRole, capVal, false);
-                ovrEl.innerText = ovr;
-                ovrEl.style.backgroundColor = getStatColor(ovr);
-                ovrEl.style.color = '#fff';
+            if (isTargetPosMain || isTargetPosSec) {
+                let generatedOvrVal = getOvrForPosition(transientDummyPlayer, iterationalPos, validatedActiveRole, resultingCapacityVal, false);
+                internalOvrLabelNode.innerText = generatedOvrVal;
+                internalOvrLabelNode.style.backgroundColor = getStatColor(generatedOvrVal);
+                internalOvrLabelNode.style.color = '#fff';
             } else {
-                ovrEl.innerText = '--';
-                ovrEl.style.backgroundColor = 'rgba(0,0,0,0.1)';
-                ovrEl.style.color = 'inherit';
+                internalOvrLabelNode.innerText = '--';
+                internalOvrLabelNode.style.backgroundColor = 'rgba(0,0,0,0.1)';
+                internalOvrLabelNode.style.color = 'inherit';
             }
         }
     });
 
     if (editingPlayerId) {
-        const index = currentPlayers.findIndex(p => String(p.id) === String(editingPlayerId));
-        if (index !== -1) {
-            currentPlayers[index].stats = statsObj;
-            currentPlayers[index].mainPos = mainPos;
-            currentPlayers[index].role = mainRole || currentPlayers[index].role;
-            currentPlayers[index].secondaryPositions = secPositions.map(s => {
-                if(s.role === "") s.role = getBestRoleForStats(s.pos, statsObj);
-                return s;
+        const foundPlayerIndex = currentPlayers.findIndex(pObj => String(pObj.id) === String(editingPlayerId));
+        if (foundPlayerIndex !== -1) {
+            currentPlayers[foundPlayerIndex].stats = collectedStatsObj;
+            currentPlayers[foundPlayerIndex].mainPos = parsedMainPos;
+            currentPlayers[foundPlayerIndex].role = establishedMainRole || currentPlayers[foundPlayerIndex].role;
+            currentPlayers[foundPlayerIndex].secondaryPositions = assignedSecPositionsArray.map(secMap => {
+                if(secMap.role === "") secMap.role = getBestRoleForStats(secMap.pos, collectedStatsObj);
+                return secMap;
             });
-            currentPlayers[index].condition = document.getElementById('pCond')?.value || "Tam";
-            currentPlayers[index].firstName = document.getElementById('pName')?.value.trim() || "İsimsiz";
-            const lName = document.getElementById('pLastName')?.value.trim() || "";
-            currentPlayers[index].lastName = lName;
-            currentPlayers[index].name = lName ? `${currentPlayers[index].firstName} ${lName}` : currentPlayers[index].firstName;
-            currentPlayers[index].shortName = document.getElementById('pShortName')?.value.trim() || "";
+            currentPlayers[foundPlayerIndex].condition = document.getElementById('pCond')?.value || "Tam";
+            currentPlayers[foundPlayerIndex].firstName = document.getElementById('pName')?.value.trim() || "İsimsiz";
+            const collectedLastNameData = document.getElementById('pLastName')?.value.trim() || "";
+            currentPlayers[foundPlayerIndex].lastName = collectedLastNameData;
+            currentPlayers[foundPlayerIndex].name = collectedLastNameData ? `${currentPlayers[foundPlayerIndex].firstName} ${collectedLastNameData}` : currentPlayers[foundPlayerIndex].firstName;
+            currentPlayers[foundPlayerIndex].shortName = document.getElementById('pShortName')?.value.trim() || "";
         }
     }
 }
 
 function renderPositionMap() {
-    const mapEl = document.getElementById('secPosMap');
-    const rawPos = document.getElementById('pMainPos')?.value || 'CB';
-    const mainPos = getBasePosition(rawPos);
-    if(!mapEl) return;
+    const parentMapContainer = document.getElementById('secPosMap');
+    const extractRawPosData = document.getElementById('pMainPos')?.value || 'CB';
+    const computedMainPos = getBasePosition(extractRawPosData);
+    if(!parentMapContainer) return;
     
-    const oldSecs = {};
-    document.querySelectorAll('.pos-btn-group').forEach(g => {
-        const p = g.dataset.pos;
-        if (g.classList.contains('active-sec')) {
-            oldSecs[p] = { cap: g.querySelector('.cap-input')?.value || 80, role: g.querySelector('.role-select')?.value };
+    const preservedSecondaryState = {};
+    document.querySelectorAll('.pos-btn-group').forEach(btnGroupContainer => {
+        const targetPosData = btnGroupContainer.dataset.pos;
+        if (btnGroupContainer.classList.contains('active-sec')) {
+            preservedSecondaryState[targetPosData] = { cap: btnGroupContainer.querySelector('.cap-input')?.value || 80, role: btnGroupContainer.querySelector('.role-select')?.value };
         }
     });
 
-    mapEl.innerHTML = `
+    parentMapContainer.innerHTML = `
         <div class="pitch-center-line"></div>
         <div class="pitch-center-circle"></div>
     `;
 
-    const pitchCoords = {
-        "FW": { top: '10%', left: '50%' },
-        "LW": { top: '22%', left: '15%' },
-        "RW": { top: '22%', left: '85%' },
-        "AM": { top: '26%', left: '50%' },
-        "LM": { top: '40%', left: '15%' },
-        "CM": { top: '44%', left: '50%' },
-        "RM": { top: '40%', left: '85%' },
-        "LWB": { top: '58%', left: '15%' },
-        "DM": { top: '60%', left: '50%' },
-        "RWB": { top: '58%', left: '85%' },
+    const generatedPitchCoords = {
+        "FW": { top: '8%', left: '50%' },
+        "LW": { top: '20%', left: '15%' },
+        "RW": { top: '20%', left: '85%' },
+        "AM": { top: '24%', left: '50%' },
+        "LM": { top: '38%', left: '15%' },
+        "CM": { top: '42%', left: '50%' },
+        "RM": { top: '38%', left: '85%' },
+        "LWB": { top: '56%', left: '15%' },
+        "DM": { top: '58%', left: '50%' },
+        "RWB": { top: '56%', left: '85%' },
         "LB": { top: '76%', left: '15%' },
         "CB": { top: '76%', left: '50%' },
         "RB": { top: '76%', left: '85%' },
         "GK": { top: '92%', left: '50%' }
     };
 
-    ALL_POSITIONS.forEach(pos => {
-      const groupDiv = document.createElement('div');
-      groupDiv.className = `pos-btn-group ${pos === mainPos ? 'main-pos' : ''}`;
-      groupDiv.dataset.pos = pos;
-      groupDiv.style.top = pitchCoords[pos].top;
-      groupDiv.style.left = pitchCoords[pos].left;
+    ALL_POSITIONS.forEach(generatedPosItem => {
+      const parentGroupElementNode = document.createElement('div');
+      parentGroupElementNode.className = `pos-btn-group ${generatedPosItem === computedMainPos ? 'main-pos' : ''}`;
+      parentGroupElementNode.dataset.pos = generatedPosItem;
+      parentGroupElementNode.style.top = generatedPitchCoords[generatedPosItem].top;
+      parentGroupElementNode.style.left = generatedPitchCoords[generatedPosItem].left;
       
-      let innerHTML = `
+      let contextualHTMLPayload = `
         <div class="node-header">
-            <span class="node-name">${pos}</span>
+            <span class="node-name">${generatedPosItem}</span>
             <span class="node-ovr">--</span>
         </div>`;
       
-      if (pos === mainPos) {
-          innerHTML += `<select class="role-select" style="display:none;"></select>`;
+      if (generatedPosItem === computedMainPos) {
+          contextualHTMLPayload += `<select class="role-select" style="display:none;"></select>`;
       } else {
-          innerHTML += `
+          contextualHTMLPayload += `
           <div class="sec-controls">
               <div class="spinner-wrapper" style="height:24px; width:100%; display:flex;">
                   <button type="button" class="spin-btn minus">-</button>
@@ -1241,302 +1287,301 @@ function renderPositionMap() {
               <select class="role-select"></select>
           </div>`;
       }
-      groupDiv.innerHTML = innerHTML;
+      parentGroupElementNode.innerHTML = contextualHTMLPayload;
       
-      const roleSelect = groupDiv.querySelector('.role-select');
-      if (ROLE_WEIGHTS && ROLE_WEIGHTS[pos]) {
-          const emptyOpt = document.createElement('option'); emptyOpt.value = ""; emptyOpt.text = "Rol Seçiniz"; emptyOpt.disabled = true; emptyOpt.selected = true; roleSelect.appendChild(emptyOpt);
-          Object.keys(ROLE_WEIGHTS[pos]).forEach(r => { const opt = document.createElement('option'); opt.value = r; opt.text = r; roleSelect.appendChild(opt); });
+      const referenceRoleSelectNode = parentGroupElementNode.querySelector('.role-select');
+      if (ROLE_WEIGHTS && ROLE_WEIGHTS[generatedPosItem]) {
+          const defaultEmptyOption = document.createElement('option'); defaultEmptyOption.value = ""; defaultEmptyOption.text = "Rol Seçiniz"; defaultEmptyOption.disabled = true; defaultEmptyOption.selected = true; referenceRoleSelectNode.appendChild(defaultEmptyOption);
+          Object.keys(ROLE_WEIGHTS[generatedPosItem]).forEach(rConfig => { const generatedOptionNode = document.createElement('option'); generatedOptionNode.value = rConfig; generatedOptionNode.text = rConfig; referenceRoleSelectNode.appendChild(generatedOptionNode); });
       }
       
-      roleSelect.addEventListener('change', () => { groupDiv.dataset.manual = 'true'; updateLiveRoles(); });
+      referenceRoleSelectNode.addEventListener('change', () => { parentGroupElementNode.dataset.manual = 'true'; updateLiveRoles(); });
       
-      if (pos !== mainPos) {
-          const capInput = groupDiv.querySelector('.cap-input');
-          capInput.addEventListener('input', () => updateLiveRoles());
-          groupDiv.querySelector('.minus').addEventListener('click', e => { e.stopPropagation(); capInput.value = Math.max(25, Number(capInput.value) - 5); updateLiveRoles(); });
-          groupDiv.querySelector('.plus').addEventListener('click', e => { e.stopPropagation(); capInput.value = Math.min(100, Number(capInput.value) + 5); updateLiveRoles(); });
-      }
-
-      if (oldSecs[pos] && pos !== mainPos) {
-          groupDiv.classList.add('active-sec');
-          const ci = groupDiv.querySelector('.cap-input'); if(ci) ci.value = oldSecs[pos].cap;
-          const rs = groupDiv.querySelector('.role-select'); if(rs) rs.value = oldSecs[pos].role;
-          groupDiv.dataset.manual = 'true';
+      if (generatedPosItem !== computedMainPos) {
+          const capInputNodeReference = parentGroupElementNode.querySelector('.cap-input');
+          capInputNodeReference.addEventListener('input', () => updateLiveRoles());
+          parentGroupElementNode.querySelector('.minus').addEventListener('click', eventParam => { eventParam.stopPropagation(); capInputNodeReference.value = Math.max(25, Number(capInputNodeReference.value) - 5); updateLiveRoles(); });
+          parentGroupElementNode.querySelector('.plus').addEventListener('click', eventParam => { eventParam.stopPropagation(); capInputNodeReference.value = Math.min(100, Number(capInputNodeReference.value) + 5); updateLiveRoles(); });
       }
 
-      groupDiv.addEventListener('click', (e) => {
-          if(e.target.closest('.sec-controls') || e.target.closest('.role-select')) return;
-          const isMain = groupDiv.dataset.pos === getBasePosition(document.getElementById('pMainPos')?.value || 'CB');
-          if (!isMain) { groupDiv.classList.toggle('active-sec'); updateLiveRoles(); }
+      if (preservedSecondaryState[generatedPosItem] && generatedPosItem !== computedMainPos) {
+          parentGroupElementNode.classList.add('active-sec');
+          const capacityInputValueCheck = parentGroupElementNode.querySelector('.cap-input'); if(capacityInputValueCheck) capacityInputValueCheck.value = preservedSecondaryState[generatedPosItem].cap;
+          const roleSelectorValueCheck = parentGroupElementNode.querySelector('.role-select'); if(roleSelectorValueCheck) roleSelectorValueCheck.value = preservedSecondaryState[generatedPosItem].role;
+          parentGroupElementNode.dataset.manual = 'true';
+      }
+
+      parentGroupElementNode.addEventListener('click', (eventParam) => {
+          if(eventParam.target.closest('.sec-controls') || eventParam.target.closest('.role-select')) return;
+          const isIdentifiedAsMainCheck = parentGroupElementNode.dataset.pos === getBasePosition(document.getElementById('pMainPos')?.value || 'CB');
+          if (!isIdentifiedAsMainCheck) { parentGroupElementNode.classList.toggle('active-sec'); updateLiveRoles(); }
       });
       
-      mapEl.appendChild(groupDiv);
+      parentMapContainer.appendChild(parentGroupElementNode);
     });
     updateLiveRoles(); 
 }
 
-function handleAddPlayer(e) {
-    if(e) e.preventDefault();
+function handlePlayerAdditionProcess(eventParam) {
+    if(eventParam) eventParam.preventDefault();
     
-    const rawMainPos = document.getElementById('pMainPos')?.value || "CB";
-    const mainPos = getBasePosition(rawMainPos); 
-    const mainGroup = document.querySelector(`.pos-btn-group.main-pos`);
+    const acquiredRawMainPos = document.getElementById('pMainPos')?.value || "CB";
+    const establishedMainPosLogic = getBasePosition(acquiredRawMainPos); 
+    const mainGroupInterfaceNode = document.querySelector(`.pos-btn-group.main-pos`);
     
-    let mainRole = mainGroup && mainGroup.querySelector('.role-select') ? mainGroup.querySelector('.role-select').value : "";
+    let verifiedMainRoleData = mainGroupInterfaceNode && mainGroupInterfaceNode.querySelector('.role-select') ? mainGroupInterfaceNode.querySelector('.role-select').value : "";
     
-    if (mainRole === "") {
-        alert("Lütfen ana mevki için bir rol seçin!");
+    if (verifiedMainRoleData === "") {
+        alert("Geçerli bir ana mevki rolü seçmeniz gerekmektedir.");
         return;
     }
 
-    let missingSecRole = false;
-    document.querySelectorAll('.pos-btn-group.active-sec').forEach(btn => {
-        let secRole = btn.querySelector('.role-select') ? btn.querySelector('.role-select').value : "";
-        if (secRole === "") missingSecRole = true;
+    let isMissingSecondaryRoleStatus = false;
+    document.querySelectorAll('.pos-btn-group.active-sec').forEach(activeBtnNode => {
+        let contextualSecRoleExtract = activeBtnNode.querySelector('.role-select') ? activeBtnNode.querySelector('.role-select').value : "";
+        if (contextualSecRoleExtract === "") isMissingSecondaryRoleStatus = true;
     });
 
-    if (missingSecRole) {
-        alert("Lütfen aktif ettiğiniz yan mevkiler için bir rol seçin!");
+    if (isMissingSecondaryRoleStatus) {
+        alert("Lütfen aktif ettiğiniz tüm yan mevkiler için geçerli bir rol tanımlayın.");
         return;
     }
     
-    const statsObj = { 
+    const configuredStatsObjectPayload = { 
         pas: Number(document.getElementById('sPas')?.value) || 0, savunma: Number(document.getElementById('sSavunma')?.value) || 0, 
         sut: Number(document.getElementById('sSut')?.value) || 0, şut: Number(document.getElementById('sSut')?.value) || 0,
         dribling: Number(document.getElementById('sDribling')?.value) || 0, firsat: Number(document.getElementById('sFirsat')?.value) || 0, fırsat: Number(document.getElementById('sFirsat')?.value) || 0, 
         hava: Number(document.getElementById('sHava')?.value) || 0, sutKarsilama: Number(document.getElementById('sSutKar')?.value) || 0 
     };
 
-    const fNameVal = document.getElementById('pName')?.value.trim() || "İsimsiz";
-    const lNameVal = document.getElementById('pLastName')?.value.trim() || "";
-    const shortNameVal = document.getElementById('pShortName')?.value.trim() || "";
+    const firstRegistrationNameParam = document.getElementById('pName')?.value.trim() || "İsimsiz";
+    const lastRegistrationNameParam = document.getElementById('pLastName')?.value.trim() || "";
+    const shortRegistrationNameParam = document.getElementById('pShortName')?.value.trim() || "";
 
-    let existingBans = [];
+    let currentExistingBansConfig = [];
     if (editingPlayerId) {
-        const ep = currentPlayers.find(p => String(p.id) === String(editingPlayerId));
-        if (ep && ep.bannedPositions) existingBans = JSON.parse(JSON.stringify(ep.bannedPositions)); 
+        const evaluatedEditingPlayer = currentPlayers.find(p => String(p.id) === String(editingPlayerId));
+        if (evaluatedEditingPlayer && evaluatedEditingPlayer.bannedPositions) currentExistingBansConfig = JSON.parse(JSON.stringify(evaluatedEditingPlayer.bannedPositions)); 
     }
 
-    const playerData = {
+    const constructedPlayerDataObject = {
         id: editingPlayerId ? editingPlayerId : Date.now(),
-        firstName: fNameVal, lastName: lNameVal, name: lNameVal ? `${fNameVal} ${lNameVal}` : fNameVal,
-        shortName: shortNameVal, mainPos: mainPos, role: mainRole, condition: document.getElementById('pCond')?.value || "Tam", stats: statsObj, selected: true, secondaryPositions: [],
-        bannedPositions: existingBans 
+        firstName: firstRegistrationNameParam, lastName: lastRegistrationNameParam, name: lastRegistrationNameParam ? `${firstRegistrationNameParam} ${lastRegistrationNameParam}` : firstRegistrationNameParam,
+        shortName: shortRegistrationNameParam, mainPos: establishedMainPosLogic, role: verifiedMainRoleData, condition: document.getElementById('pCond')?.value || "Tam", stats: configuredStatsObjectPayload, selected: true, secondaryPositions: [],
+        bannedPositions: currentExistingBansConfig 
     };
 
-    document.querySelectorAll('.pos-btn-group.active-sec').forEach(btn => {
-        let secRole = btn.querySelector('.role-select').value;
-        playerData.secondaryPositions.push({
-            pos: getBasePosition(btn.dataset.pos), role: secRole,
-            capacity: Math.max(25, Number(btn.querySelector('.cap-input')?.value || 80))
+    document.querySelectorAll('.pos-btn-group.active-sec').forEach(activeBtnNode => {
+        let extractingSecRoleFromNode = activeBtnNode.querySelector('.role-select').value;
+        constructedPlayerDataObject.secondaryPositions.push({
+            pos: getBasePosition(activeBtnNode.dataset.pos), role: extractingSecRoleFromNode,
+            capacity: Math.max(25, Number(activeBtnNode.querySelector('.cap-input')?.value || 80))
         });
     });
 
     if (editingPlayerId) {
-        const index = currentPlayers.findIndex(p => String(p.id) === String(editingPlayerId));
-        if (index !== -1) currentPlayers[index] = playerData;
+        const foundEditedPlayerIndex = currentPlayers.findIndex(p => String(p.id) === String(editingPlayerId));
+        if (foundEditedPlayerIndex !== -1) currentPlayers[foundEditedPlayerIndex] = constructedPlayerDataObject;
         editingPlayerId = null;
-        const btn = document.getElementById('btnAddPlayer'); 
-        if(btn) { btn.innerText = "Oyuncuyu Havuza Ekle"; btn.className = "btn btn-green"; }
+        const mainAdditionBtnNode = document.getElementById('btnAddPlayer'); 
+        if(mainAdditionBtnNode) { mainAdditionBtnNode.innerText = "Oyuncuyu Havuza Ekle"; mainAdditionBtnNode.className = "btn btn-green"; }
     } else { 
-        currentPlayers.push(playerData); 
+        currentPlayers.push(constructedPlayerDataObject); 
     }
 
-    ['pName', 'pLastName', 'pShortName'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = ""; });
+    ['pName', 'pLastName', 'pShortName'].forEach(fieldIdRef => { if(document.getElementById(fieldIdRef)) document.getElementById(fieldIdRef).value = ""; });
     
-    // Ekledikten sonra yeni oyuncu için istatistikleri 40'a döndür
-    ['sPas', 'sSavunma', 'sSut', 'sDribling', 'sFirsat', 'sHava'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = 40; });
+    ['sPas', 'sSavunma', 'sSut', 'sDribling', 'sFirsat', 'sHava'].forEach(fieldIdRef => { if(document.getElementById(fieldIdRef)) document.getElementById(fieldIdRef).value = 40; });
     if(document.getElementById('sSutKar')) document.getElementById('sSutKar').value = 0;
     
-    document.querySelectorAll('.pos-btn-group.active-sec').forEach(btn => btn.classList.remove('active-sec'));
+    document.querySelectorAll('.pos-btn-group.active-sec').forEach(activeBtnNode => activeBtnNode.classList.remove('active-sec'));
     
-    const btnCancel = document.getElementById('btnCancelEdit');
-    if (btnCancel) btnCancel.style.display = 'none';
+    const uiCancelButtonNode = document.getElementById('btnCancelEdit');
+    if (uiCancelButtonNode) uiCancelButtonNode.style.display = 'none';
     
     renderPositionMap(); updatePlayerList();
     updateLiveRoles();
 }
 
 function updatePlayerList() {
-    const listEl = document.getElementById('playerListEl'); if (!listEl) return;
+    const listElementNodeContainer = document.getElementById('playerListEl'); if (!listElementNodeContainer) return;
     chartInstances = {};
     
-    const openStates = {};
-    document.querySelectorAll('details.player-item, details.category-item').forEach(det => { if (det.open) openStates[det.id] = true; });
+    const trackedOpenStatesDict = {};
+    document.querySelectorAll('details.player-item, details.category-item').forEach(detNodeReference => { if (detNodeReference.open) trackedOpenStatesDict[detNodeReference.id] = true; });
 
-    const format = Number(document.getElementById('matchFormat')?.value || 7);
-    const req = format * 2; const sel = currentPlayers.filter(p => p.selected).length;
-    const statusEl = document.getElementById('selectionStatus');
-    if (statusEl) { statusEl.innerText = `Seçilen: ${sel} / ${req}`; statusEl.style.color = sel === req ? "#a8e63d" : "#e74c3c"; }
+    const formatConfigurationScale = Number(document.getElementById('matchFormat')?.value || 7);
+    const calculatedRequirementThreshold = formatConfigurationScale * 2; const activeSelectedPlayerCount = currentPlayers.filter(p => p.selected).length;
+    const trackerStatusIndicatorNode = document.getElementById('selectionStatus');
+    if (trackerStatusIndicatorNode) { trackerStatusIndicatorNode.innerText = `Seçili: ${activeSelectedPlayerCount} / ${calculatedRequirementThreshold}`; trackerStatusIndicatorNode.style.color = activeSelectedPlayerCount === calculatedRequirementThreshold ? "#a8e63d" : "#e74c3c"; }
 
-    let html = "";
-    const categories = [ 
-        { id: "cat-gk", t: "🧤 KALECİLER", p: ["GK"] }, 
-        { id: "cat-def", t: "🛡️ SAVUNMALAR", p: ["CB", "LB", "RB", "LWB", "RWB"] }, 
-        { id: "cat-mid", t: "⚙️ ORTA SAHALAR", p: ["DM", "CM", "AM", "LM", "RM"] }, 
-        { id: "cat-atk", t: "⚔️ HÜCUMCULAR", p: ["LW", "RW", "FW"] } 
+    let outputHtmlConstructionBuffer = "";
+    const positionalCategoriesStructure = [ 
+        { id: "cat-gk", t: "KALECİLER", p: ["GK"] }, 
+        { id: "cat-def", t: "SAVUNMALAR", p: ["CB", "LB", "RB", "LWB", "RWB"] }, 
+        { id: "cat-mid", t: "ORTA SAHALAR", p: ["DM", "CM", "AM", "LM", "RM"] }, 
+        { id: "cat-atk", t: "HÜCUMCULAR", p: ["LW", "RW", "FW"] } 
     ];
 
-    categories.forEach(cat => {
-        const pList = currentPlayers.filter(p => cat.p.includes(getBasePosition(p.mainPos)));
-        if (pList.length > 0) {
-            const isOpen = openStates[cat.id] !== false; 
+    positionalCategoriesStructure.forEach(internalCategoryDef => {
+        const matchingPlayerCollection = currentPlayers.filter(pObj => internalCategoryDef.p.includes(getBasePosition(pObj.mainPos)));
+        if (matchingPlayerCollection.length > 0) {
+            const isCategoryVisuallyOpen = trackedOpenStatesDict[internalCategoryDef.id] !== false; 
             
-            html += `<details class="category-item" id="${cat.id}" ${isOpen ? 'open' : ''} style="margin: 10px 5px 5px 5px; border-radius: 4px; overflow: hidden; border: 1px solid #1a6b2e; box-sizing: border-box;">
+            outputHtmlConstructionBuffer += `<details class="category-item" id="${internalCategoryDef.id}" ${isCategoryVisuallyOpen ? 'open' : ''} style="margin: 10px 5px 5px 5px; border-radius: 4px; overflow: hidden; border: 1px solid #1a6b2e; box-sizing: border-box;">
                         <summary style="background: #1a6b2e; color: white; padding: 8px 12px; cursor: pointer; font-weight: bold; list-style: none; display: flex; justify-content: space-between; align-items: center; user-select: none;">
-                            <span>${cat.t} (${pList.length})</span>
+                            <span>${internalCategoryDef.t} (${matchingPlayerCollection.length})</span>
                             <span style="font-size: 0.8em; opacity: 0.8;">▼</span>
                         </summary>
                         <div style="padding: 5px;">`;
             
-            html += pList.map(p => {
-                const nameColor = p.isTest ? '#2ecc71' : 'inherit'; 
-                const displayNameHtml = p.shortName?.trim() ? ` <span style="color:var(--text-muted); font-size:0.85em;">(${p.shortName.trim()})</span>` : '';
-                const condHeart = getConditionHeart(p.condition);
+            outputHtmlConstructionBuffer += matchingPlayerCollection.map(renderingPlayerInstance => {
+                const calculatedNameRenderingColor = renderingPlayerInstance.isTest ? '#2ecc71' : 'inherit'; 
+                const shortNameDisplayHtmlFragment = renderingPlayerInstance.shortName?.trim() ? ` <span style="color:var(--text-muted); font-size:0.85em;">(${renderingPlayerInstance.shortName.trim()})</span>` : '';
+                const conditionSvgCodeComponent = getConditionHeart(renderingPlayerInstance.condition);
                 
-                const effBase = getEffectivePlayerInfo(p, false);
-                const effActive = getEffectivePlayerInfo(p, true);
+                const calculatedEffectiveBaseInfo = getEffectivePlayerInfo(renderingPlayerInstance, false);
+                const calculatedEffectiveActiveInfo = getEffectivePlayerInfo(renderingPlayerInstance, true);
                 
-                const posDisplay = effBase.isBanned ? `<s style="color:#e74c3c;">${effBase.original}</s> <span style="color:#e67e22; font-size:0.9em; font-weight:bold;">(En İyi Mevki: ${effBase.active})</span>` : `${effBase.original}`;
-                const roleDisplay = effBase.isBanned && effBase.active !== 'Yok' ? `<span style="color:#1a6b2e;">(${effBase.activeRole})</span>` : `<span style="color:#1a6b2e;">(${p.role})</span>`;
+                const visualPositionDisplayConfig = calculatedEffectiveBaseInfo.isBanned ? `<s style="color:#e74c3c;">${calculatedEffectiveBaseInfo.original}</s> <span style="color:#e67e22; font-size:0.9em; font-weight:bold;">(En İyi Mevki: ${calculatedEffectiveBaseInfo.active})</span>` : `${calculatedEffectiveBaseInfo.original}`;
+                const visualRoleDisplayConfig = calculatedEffectiveBaseInfo.isBanned && calculatedEffectiveBaseInfo.active !== 'Yok' ? `<span style="color:#1a6b2e;">(${calculatedEffectiveBaseInfo.activeRole})</span>` : `<span style="color:#1a6b2e;">(${renderingPlayerInstance.role})</span>`;
 
-                const havaVal = p.stats.hava||0; const pasVal = p.stats.pas||0; const savVal = p.stats.savunma||0;
-                const sutVal = getBasePosition(p.mainPos)==='GK'?(p.stats.sutKarsilama||0):(p.stats.sut ?? (p.stats.şut||0));
-                const dribVal = p.stats.dribling||0; const firsatVal = p.stats.firsat ?? (p.stats.fırsat||0);
+                const havaValueParam = renderingPlayerInstance.stats.hava||0; const pasValueParam = renderingPlayerInstance.stats.pas||0; const savValueParam = renderingPlayerInstance.stats.savunma||0;
+                const sutValueParam = getBasePosition(renderingPlayerInstance.mainPos)==='GK'?(renderingPlayerInstance.stats.sutKarsilama||0):(renderingPlayerInstance.stats.sut ?? (renderingPlayerInstance.stats.şut||0));
+                const dribValueParam = renderingPlayerInstance.stats.dribling||0; const firsatValueParam = renderingPlayerInstance.stats.firsat ?? (renderingPlayerInstance.stats.fırsat||0);
 
-                const statsHtml = `
+                const tabularStatsHtmlOutput = `
                   <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.95em; width: 100%;">
-                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>Hava Topu:</b> <span style="font-weight:bold; color:${getStatColor(havaVal)};">${havaVal}</span></div>
-                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>Pas D.:</b> <span style="font-weight:bold; color:${getStatColor(pasVal)};">${pasVal}</span></div>
-                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>Savunma:</b> <span style="font-weight:bold; color:${getStatColor(savVal)};">${savVal}</span></div>
-                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>${getBasePosition(p.mainPos)==='GK'?'Şut Karşılama':'Şut'}:</b> <span style="font-weight:bold; color:${getStatColor(sutVal)};">${sutVal}</span></div>
-                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>Dribling:</b> <span style="font-weight:bold; color:${getStatColor(dribVal)};">${dribVal}</span></div>
-                    <div style="display: flex; justify-content: space-between; padding-bottom: 0;"><b>Fırsat Y.:</b> <span style="font-weight:bold; color:${getStatColor(firsatVal)};">${firsatVal}</span></div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>Hava Topu:</b> <span style="font-weight:bold; color:${getStatColor(havaValueParam)};">${havaValueParam}</span></div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>Pas D.:</b> <span style="font-weight:bold; color:${getStatColor(pasValueParam)};">${pasValueParam}</span></div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>Savunma:</b> <span style="font-weight:bold; color:${getStatColor(savValueParam)};">${savValueParam}</span></div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>${getBasePosition(renderingPlayerInstance.mainPos)==='GK'?'Şut Karşılama':'Şut'}:</b> <span style="font-weight:bold; color:${getStatColor(sutValueParam)};">${sutValueParam}</span></div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>Dribling:</b> <span style="font-weight:bold; color:${getStatColor(dribValueParam)};">${dribValueParam}</span></div>
+                    <div style="display: flex; justify-content: space-between; padding-bottom: 0;"><b>Fırsat Y.:</b> <span style="font-weight:bold; color:${getStatColor(firsatValueParam)};">${firsatValueParam}</span></div>
                   </div>
                 `;
 
-                const yanMevkilerHtml = p.secondaryPositions.length > 0 
-                    ? p.secondaryPositions.map(sp => `<span class="badge" style="background:${getStatColor(sp.capacity === 100 ? 85 : (sp.capacity>50?65:30))};">${sp.pos} (%${sp.capacity})</span>`).join('') 
+                const optionalSecondaryPosBadgesHtml = renderingPlayerInstance.secondaryPositions.length > 0 
+                    ? renderingPlayerInstance.secondaryPositions.map(spMapping => `<span class="badge" style="background:${getStatColor(spMapping.capacity === 100 ? 85 : (spMapping.capacity>50?65:30))};">${spMapping.pos} (%${spMapping.capacity})</span>`).join('') 
                     : '<span style="font-size:0.85em; color:var(--text-muted);">Yok</span>';
 
-                let ovrBadgeText = `${effBase.ovr} OVR`;
-                if (effBase.ovr !== effActive.ovr) {
-                    ovrBadgeText = `${effBase.ovr} OVR (Aktif: ${effActive.ovr})`;
+                let dynamicOvrBadgeConstruction = `${calculatedEffectiveBaseInfo.ovr} OVR`;
+                if (calculatedEffectiveBaseInfo.ovr !== calculatedEffectiveActiveInfo.ovr) {
+                    dynamicOvrBadgeConstruction = `${calculatedEffectiveBaseInfo.ovr} OVR (Aktif: ${calculatedEffectiveActiveInfo.ovr})`;
                 }
 
                 return `
-                <details class="player-item" id="details-${p.id}" style="margin-bottom: 8px;">
+                <details class="player-item" id="details-${renderingPlayerInstance.id}" style="margin-bottom: 8px;">
                   <summary class="player-summary">
                     <div style="display: flex; align-items: center; gap: 10px;">
-                      <input type="checkbox" class="player-select-cb" data-id="${p.id}" ${p.selected ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer;">
-                      <span style="${p.selected ? '' : 'text-decoration:line-through; opacity:0.5;'}">
-                        <b style="color:${nameColor};">${p.name}</b>${displayNameHtml} <span class="cond-icon">${condHeart}</span> <span class="pitch-ovr-text" style="background:${getStatColor(effBase.ovr)}; color:white; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding:2px 6px; border-radius:4px; font-size:0.8em; margin-left:4px;">${ovrBadgeText}</span> | ${posDisplay} ${roleDisplay}
+                      <input type="checkbox" class="player-select-cb" data-id="${renderingPlayerInstance.id}" ${renderingPlayerInstance.selected ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer;">
+                      <span style="${renderingPlayerInstance.selected ? '' : 'text-decoration:line-through; opacity:0.5;'}">
+                        <b style="color:${calculatedNameRenderingColor};">${renderingPlayerInstance.name}</b>${shortNameDisplayHtmlFragment} <span class="cond-icon">${conditionSvgCodeComponent}</span> <span class="pitch-ovr-text" style="background:${getStatColor(calculatedEffectiveBaseInfo.ovr)}; color:white; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding:2px 6px; border-radius:4px; font-size:0.8em; margin-left:4px; white-space:nowrap; display:inline-block;">${dynamicOvrBadgeConstruction}</span> | ${visualPositionDisplayConfig} ${visualRoleDisplayConfig}
                       </span>
                     </div>
                   </summary>
                   
                   <div class="player-details-row">
                     <div class="pd-col-stats">
-                        ${statsHtml}
+                        ${tabularStatsHtmlOutput}
                         <div style="position:relative; width:100%; max-width: 220px; aspect-ratio: 1/1; margin: 10px auto 0 auto; display: flex; justify-content: center;">
-                            <canvas id="chart-${p.id}"></canvas>
+                            <canvas id="chart-${renderingPlayerInstance.id}"></canvas>
                         </div>
                     </div>
                     <div class="pd-col-pitch">
-                        <span style="font-size:0.85em; font-weight:bold; color:var(--text-muted); text-align:center;">📍 Mevki Haritası<br><span style="font-size:0.8em; color:#e74c3c;">(Tıklayarak yasakla)</span></span>
+                        <span style="font-size:0.85em; font-weight:bold; color:var(--text-muted); text-align:center;">Mevki Haritası<br><span style="font-size:0.8em; color:#e74c3c;">(Tıklayarak yasakla)</span></span>
                         <div style="background: var(--pitch-bg); border-radius: 4px; padding: 2px;">
-                            ${generateMiniPitchHTML(p, "160px")}
+                            ${generateMiniPitchHTML(renderingPlayerInstance, "160px")}
                         </div>
                     </div>
                     <div class="pd-col-sec">
                         <div>
                             <span style="font-size:0.9em; font-weight:bold; display:block; margin-bottom:8px;">Yan Mevkiler:</span>
                             <div class="sec-pos-badges">
-                                ${yanMevkilerHtml}
+                                ${optionalSecondaryPosBadgesHtml}
                             </div>
                         </div>
                     </div>
                     <div style="flex-basis: 100%; display: flex; gap: 15px; margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 15px; justify-content: flex-start;">
-                        <button type="button" class="btn btn-yellow btn-edit" data-id="${p.id}" style="min-width: 120px;">Düzenle</button>
-                        <button type="button" class="btn btn-red btn-delete" data-id="${p.id}" style="min-width: 120px;">Sil</button>
+                        <button type="button" class="btn btn-yellow btn-edit" data-id="${renderingPlayerInstance.id}" style="min-width: 120px;">Düzenle</button>
+                        <button type="button" class="btn btn-red btn-delete" data-id="${renderingPlayerInstance.id}" style="min-width: 120px;">Sil</button>
                     </div>
                   </div>
                 </details>`;
             }).join('');
             
-            html += `</div></details>`;
+            outputHtmlConstructionBuffer += `</div></details>`;
         }
     });
-    listEl.innerHTML = html;
+    listElementNodeContainer.innerHTML = outputHtmlConstructionBuffer;
 
-    document.querySelectorAll('details.player-item').forEach(det => { if (openStates[det.id]) det.open = true; });
-    document.querySelectorAll('.player-select-cb').forEach(cb => { cb.addEventListener('change', e => { const p = currentPlayers.find(x => String(x.id) === String(e.target.dataset.id)); if (p) p.selected = e.target.checked; updatePlayerList(); }); });
-    document.querySelectorAll('.player-item').forEach(det => { det.addEventListener('toggle', () => { if (det.open) renderRadarChart(Number(det.id.split('-')[1])); }); });
+    document.querySelectorAll('details.player-item').forEach(detNode => { if (trackedOpenStatesDict[detNode.id]) detNode.open = true; });
+    document.querySelectorAll('.player-select-cb').forEach(cbNode => { cbNode.addEventListener('change', eventContext => { const contextualPlayerObj = currentPlayers.find(x => String(x.id) === String(eventContext.target.dataset.id)); if (contextualPlayerObj) contextualPlayerObj.selected = eventContext.target.checked; updatePlayerList(); }); });
+    document.querySelectorAll('.player-item').forEach(detNode => { detNode.addEventListener('toggle', () => { if (detNode.open) renderRadarChart(Number(detNode.id.split('-')[1])); }); });
 }
 
-function renderSimCard(index) {
-    const container = document.getElementById(`sim-card-container-${index}`);
-    if (!container) return;
+function renderSimCard(processingCardIndex) {
+    const mainContainerNodeDef = document.getElementById(`sim-card-container-${processingCardIndex}`);
+    if (!mainContainerNodeDef) return;
 
     document.body.classList.remove('is-dragging');
 
-    const dataObj = simResults[index];
-    const data = dataObj.active;
+    const referencedDataConfig = simResults[processingCardIndex];
+    const retrievedActiveLineupsData = referencedDataConfig.active;
     
-    const isModified = JSON.stringify(dataObj.active.lineupA.lineup) !== JSON.stringify(dataObj.original.lineupA.lineup) || 
-                       JSON.stringify(dataObj.active.lineupB.lineup) !== JSON.stringify(dataObj.original.lineupB.lineup);
+    const configurationHasModificationsFlag = JSON.stringify(referencedDataConfig.active.lineupA.lineup) !== JSON.stringify(referencedDataConfig.original.lineupA.lineup) || 
+                       JSON.stringify(referencedDataConfig.active.lineupB.lineup) !== JSON.stringify(referencedDataConfig.original.lineupB.lineup);
 
-    const trueStatsA = data.lineupA.stats.normalized;
-    const trueStatsB = data.lineupB.stats.normalized;
+    const evaluationNormalizedStatsA = retrievedActiveLineupsData.lineupA.stats.normalized;
+    const evaluationNormalizedStatsB = retrievedActiveLineupsData.lineupB.stats.normalized;
 
-    const resetBtnHtml = isModified ? `<button class="btn-reset-sim" data-card="${index}" style="margin-left:auto; background:#e74c3c; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-size:0.85em; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3); transition: all 0.2s;">🔄 Sıfırla</button>` : '';
+    const dynamicResetControlHTML = configurationHasModificationsFlag ? `<button class="btn-reset-sim" data-card="${processingCardIndex}" style="margin-left:auto; background:#e74c3c; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-size:0.85em; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3); transition: all 0.2s;">Sıfırla</button>` : '';
 
-    let logHtml = `<div style="color:var(--text-muted); font-size:0.9em; padding:10px;">Değiştirilmiş kadrolar için log hesaplanamaz. Sıfırlayınız.</div>`;
-    if (!isModified && dataObj.original.metricsDetails) {
-        const details = dataObj.original.metricsDetails;
-        const formatCliff = (name, obj) => {
-            if(obj.diff === 0 && obj.pen === 0) return `<span style="color:#7f8c8d;">${name}: 0</span>`;
-            let mathStr = obj.diff > 5 ? `(${obj.diff}-5)³` : `(${obj.diff} ≤ 5)`;
-            let color = obj.diff > 5 ? '#e74c3c' : '#2ecc71';
-            return `<span>${name}: |Fark ${obj.diff}| ➔ ${mathStr} = <b style="color:${color};">${obj.pen}</b></span>`;
+    let constructedLogDetailsHTML = `<div style="color:var(--text-muted); font-size:0.9em; padding:10px;">Değiştirilmiş kadrolar için ayrıntılı performans analizi hesaplanamaz. Analizi görmek için sıfırlayınız.</div>`;
+    if (!configurationHasModificationsFlag && referencedDataConfig.original.metricsDetails) {
+        const metricDetailsObjContext = referencedDataConfig.original.metricsDetails;
+        const formattingUtilityFn = (propName, innerPropObj) => {
+            if(innerPropObj.diff === 0 && innerPropObj.pen === 0) return `<span style="color:#7f8c8d;">${propName}: 0</span>`;
+            let mathematicalVisualString = innerPropObj.diff > 5 ? `(${innerPropObj.diff}-5)³` : `(${innerPropObj.diff} ≤ 5)`;
+            let activeRenderColorStatus = innerPropObj.diff > 5 ? '#e74c3c' : '#2ecc71';
+            return `<span>${propName}: |Fark ${innerPropObj.diff}| ➔ ${mathematicalVisualString} = <b style="color:${activeRenderColorStatus};">${innerPropObj.pen}</b></span>`;
         };
-        const isHavaLow = document.getElementById('cbLowHava')?.checked;
+        const validationCheckHavaLowCondition = document.getElementById('cbLowHava')?.checked;
 
-        logHtml = `
+        constructedLogDetailsHTML = `
             <div class="sim-log-content" style="font-family: monospace; font-size: 0.9em; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 4px; line-height: 1.6;">
-                <div style="color: #bdc3c7; margin-bottom: 8px;"><b>[🎯] Hedef Kalite (Baseline):</b> ${dataObj.original.targetScore.toFixed(1)} OVR <span style="font-size:0.85em;">(A: ${dataObj.original.sumA.toFixed(2)} | B: ${dataObj.original.sumB.toFixed(2)})</span></div>
-                <div style="color: #3498db; margin-bottom: 4px;"><b>[1] Saf Denge:</b> <span style="color:#ecf0f1;">${details.netDiffFormula}</span> = <b>${details.netDiffPenalty.toFixed(1)} Ceza</b></div>
-                <div style="color: #e74c3c; margin-bottom: 4px;"><b>[2] Kritik Özellik Farkı Cezası:</b> <b>${details.totalCliffPenalty} Ceza</b></div>
+                <div style="color: #bdc3c7; margin-bottom: 8px;"><b>[1] Hedef Kalite (Baseline):</b> ${referencedDataConfig.original.targetScore.toFixed(1)} OVR <span style="font-size:0.85em;">(A: ${referencedDataConfig.original.sumA.toFixed(2)} | B: ${referencedDataConfig.original.sumB.toFixed(2)})</span></div>
+                <div style="color: #3498db; margin-bottom: 4px;"><b>[2] Saf Denge (Net OVR Farkı):</b> <span style="color:#ecf0f1;">${metricDetailsObjContext.netDiffFormula}</span> = <b>${metricDetailsObjContext.netDiffPenalty.toFixed(1)} Ceza</b></div>
+                <div style="color: #e74c3c; margin-bottom: 4px;"><b>[3] Kritik Özellik Farkı Cezası:</b> <b>${metricDetailsObjContext.totalCliffPenalty} Ceza</b></div>
                 <div style="padding-left: 15px; color: #95a5a6; font-size: 0.85em; margin-bottom: 8px; line-height: 1.5;">
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px;">
-                        <div>${formatCliff('Pas D.', details.cliffPenalties.pas)}</div>
-                        <div>${formatCliff('Savunma', details.cliffPenalties.savunma)}</div>
-                        <div>${formatCliff('Şut', details.cliffPenalties.sut)}</div>
-                        <div>${formatCliff('Dribling', details.cliffPenalties.dribling)}</div>
-                        <div>${formatCliff('Fırsat Y.', details.cliffPenalties.firsat)}</div>
-                        ${!isHavaLow ? `<div>${formatCliff('Hava T.', details.cliffPenalties.hava)}</div>` : ''}
+                        <div>${formattingUtilityFn('Pas D.', metricDetailsObjContext.cliffPenalties.pas)}</div>
+                        <div>${formattingUtilityFn('Savunma', metricDetailsObjContext.cliffPenalties.savunma)}</div>
+                        <div>${formattingUtilityFn('Şut', metricDetailsObjContext.cliffPenalties.sut)}</div>
+                        <div>${formattingUtilityFn('Dribling', metricDetailsObjContext.cliffPenalties.dribling)}</div>
+                        <div>${formattingUtilityFn('Fırsat Y.', metricDetailsObjContext.cliffPenalties.firsat)}</div>
+                        ${!validationCheckHavaLowCondition ? `<div>${formattingUtilityFn('Hava T.', metricDetailsObjContext.cliffPenalties.hava)}</div>` : ''}
                     </div>
                 </div>
-                <div style="color: #f1c40f; margin-bottom: 4px;"><b>[3] Formasyon Grid Cezası (Açıklar):</b> <b>${details.gridPenalty.toFixed(1)} Ceza</b></div>
+                <div style="color: #f1c40f; margin-bottom: 4px;"><b>[4] Formasyon Açık (Grid) Cezası:</b> <b>${metricDetailsObjContext.gridPenalty.toFixed(1)} Ceza</b></div>
                 <hr style="border: 0; border-top: 1px dashed rgba(255,255,255,0.2); margin: 8px 0;">
-                <div style="color: #ecf0f1; font-weight: bold; font-size: 1.1em;">NET SKOR (Düşük Daha İyi): ${details.totalPenalty.toFixed(0)}</div>
+                <div style="color: #ecf0f1; font-weight: bold; font-size: 1.1em;">NET SKOR (Düşük Daha İyi): ${metricDetailsObjContext.totalPenalty.toFixed(0)}</div>
             </div>
         `;
     }
 
-    let html = `
-    <div class="sim-result-card" style="border: ${isModified ? '2px solid #f39c12' : '1px solid var(--border-color)'}; transition: all 0.3s ease;">
+    let constructionOutputString = `
+    <div class="sim-result-card" style="border: ${configurationHasModificationsFlag ? '2px solid #f39c12' : '1px solid var(--border-color)'}; transition: all 0.3s ease;">
         <div style="color: #f39c12; font-weight: bold; font-size: 1.1em; margin-bottom: 15px; display:flex; align-items:center;">
-            ✨ SEÇENEK #${index + 1} 
-            <span style="font-size: 0.8em; color: var(--text-muted); margin-left:8px;">(Denge Skoru: ${(data.rawPenalty || data.penalty || 0).toFixed(0)})</span>
-            ${isModified ? '<span style="margin-left:8px; font-size:0.8em; color:#e74c3c;">(Değiştirildi)</span>' : ''}
-            ${resetBtnHtml}
+            SEÇENEK #${processingCardIndex + 1} 
+            <span style="font-size: 0.8em; color: var(--text-muted); margin-left:8px;">(Denge Skoru: ${(retrievedActiveLineupsData.rawPenalty || retrievedActiveLineupsData.penalty || 0).toFixed(0)})</span>
+            ${configurationHasModificationsFlag ? '<span style="margin-left:8px; font-size:0.8em; color:#e74c3c;">(Değiştirildi)</span>' : ''}
+            ${dynamicResetControlHTML}
         </div>
         
         <div class="pitch-wrapper">
-            ${generateTacticalPitchHTML(data.lineupA, 'A Takımı', '#3498db', 'A', index)}
-            ${generateTacticalPitchHTML(data.lineupB, 'B Takımı', '#e74c3c', 'B', index)}
+            ${generateTacticalPitchHTML(retrievedActiveLineupsData.lineupA, 'A Takımı', '#3498db', 'A', processingCardIndex)}
+            ${generateTacticalPitchHTML(retrievedActiveLineupsData.lineupB, 'B Takımı', '#e74c3c', 'B', processingCardIndex)}
         </div>
         
         <div class="sim-table-chart-wrap">
@@ -1551,17 +1596,17 @@ function renderSimCard(index) {
                         </tr>
                     </thead>
                     <tbody>
-                        ${renderStatRow('Hava Topu', trueStatsA.hava, trueStatsB.hava)}
-                        ${renderStatRow('Pas D.', trueStatsA.pas, trueStatsB.pas)}
-                        ${renderStatRow('Savunma', trueStatsA.savunma, trueStatsB.savunma)}
-                        ${renderStatRow('Şut', trueStatsA.sut, trueStatsB.sut)}
-                        ${renderStatRow('Dribling', trueStatsA.dribling, trueStatsB.dribling)}
-                        ${renderStatRow('Fırsat Y.', trueStatsA.firsat, trueStatsB.firsat)}
+                        ${renderStatRow('Hava Topu', evaluationNormalizedStatsA.hava, evaluationNormalizedStatsB.hava)}
+                        ${renderStatRow('Pas D.', evaluationNormalizedStatsA.pas, evaluationNormalizedStatsB.pas)}
+                        ${renderStatRow('Savunma', evaluationNormalizedStatsA.savunma, evaluationNormalizedStatsB.savunma)}
+                        ${renderStatRow('Şut', evaluationNormalizedStatsA.sut, evaluationNormalizedStatsB.sut)}
+                        ${renderStatRow('Dribling', evaluationNormalizedStatsA.dribling, evaluationNormalizedStatsB.dribling)}
+                        ${renderStatRow('Fırsat Y.', evaluationNormalizedStatsA.firsat, evaluationNormalizedStatsB.firsat)}
                     </tbody>
                 </table>
             </div>
             <div class="sim-chart-wrap">
-                <canvas id="teamChart-${index}" style="width:100%; height:100%;"></canvas>
+                <canvas id="teamChart-${processingCardIndex}" style="width:100%; height:100%;"></canvas>
             </div>
         </div>
         <details class="sim-log-details" style="margin-top: 15px; border: 1px solid var(--border-color); border-radius: 4px;">
@@ -1570,23 +1615,23 @@ function renderSimCard(index) {
                     Algoritma Karar Dökümü & Ceza Raporu
                 </span>
             </summary>
-            ${logHtml}
+            ${constructedLogDetailsHTML}
         </details>
     </div>`;
 
-    container.innerHTML = html;
+    mainContainerNodeDef.innerHTML = constructionOutputString;
 
-    if (simCharts && simCharts[index]) { simCharts[index].destroy(); }
+    if (simCharts && simCharts[processingCardIndex]) { simCharts[processingCardIndex].destroy(); }
     
-    const canvas = document.getElementById(`teamChart-${index}`);
-    if(canvas) {
-        simCharts[index] = new Chart(canvas.getContext('2d'), { 
+    const contextCanvasReference = document.getElementById(`teamChart-${processingCardIndex}`);
+    if(contextCanvasReference) {
+        simCharts[processingCardIndex] = new Chart(contextCanvasReference.getContext('2d'), { 
             type: 'radar', 
             data: { 
                 labels: ['Hava', 'Pas D.', 'Sav', 'Şut', 'Dribling', 'Fırsat Y.'], 
                 datasets: [
-                    { label: 'A Takımı', data: [Math.round(trueStatsA.hava), Math.round(trueStatsA.pas), Math.round(trueStatsA.savunma), Math.round(trueStatsA.sut), Math.round(trueStatsA.dribling), Math.round(trueStatsA.firsat)], backgroundColor: 'rgba(52, 152, 219, 0.25)', borderColor: '#3498db', borderWidth: 2, pointBackgroundColor: '#3498db', pointRadius: 2 }, 
-                    { label: 'B Takımı', data: [Math.round(trueStatsB.hava), Math.round(trueStatsB.pas), Math.round(trueStatsB.savunma), Math.round(trueStatsB.sut), Math.round(trueStatsB.dribling), Math.round(trueStatsB.firsat)], backgroundColor: 'rgba(231, 76, 60, 0.25)', borderColor: '#e74c3c', borderWidth: 2, pointBackgroundColor: '#e74c3c', pointRadius: 2 }
+                    { label: 'A Takımı', data: [Math.round(evaluationNormalizedStatsA.hava), Math.round(evaluationNormalizedStatsA.pas), Math.round(evaluationNormalizedStatsA.savunma), Math.round(evaluationNormalizedStatsA.sut), Math.round(evaluationNormalizedStatsA.dribling), Math.round(evaluationNormalizedStatsA.firsat)], backgroundColor: 'rgba(52, 152, 219, 0.25)', borderColor: '#3498db', borderWidth: 2, pointBackgroundColor: '#3498db', pointRadius: 2 }, 
+                    { label: 'B Takımı', data: [Math.round(evaluationNormalizedStatsB.hava), Math.round(evaluationNormalizedStatsB.pas), Math.round(evaluationNormalizedStatsB.savunma), Math.round(evaluationNormalizedStatsB.sut), Math.round(evaluationNormalizedStatsB.dribling), Math.round(evaluationNormalizedStatsB.firsat)], backgroundColor: 'rgba(231, 76, 60, 0.25)', borderColor: '#e74c3c', borderWidth: 2, pointBackgroundColor: '#e74c3c', pointRadius: 2 }
                 ] 
             }, 
             options: { 
@@ -1599,107 +1644,107 @@ function renderSimCard(index) {
     }
 }
 
-function runSimulation(e) {
-    if(e) e.preventDefault();
-    const output = document.getElementById('resultOutput'); if(!output) return;
-    const format = Number(document.getElementById('matchFormat')?.value || 7);
-    const forceFill = document.getElementById('cbForceFill')?.checked || false; 
-    const havaLowPriority = document.getElementById('cbLowHava')?.checked ?? true; 
+function triggerSimulationExecution(eventParam) {
+    if(eventParam) eventParam.preventDefault();
+    const targetOutputElementNode = document.getElementById('resultOutput'); if(!targetOutputElementNode) return;
+    const specifiedFormatConstraint = Number(document.getElementById('matchFormat')?.value || 7);
+    const forceFillConditionValue = document.getElementById('cbForceFill')?.checked || false; 
+    const havaLowPriorityConditionValue = document.getElementById('cbLowHava')?.checked ?? true; 
     
-    const requiredPlayers = format * 2;
-    const selectedPlayers = currentPlayers.filter(p => p.selected);
+    const requiredTotalPlayerLimit = specifiedFormatConstraint * 2;
+    const validatedSelectedPlayerCollection = currentPlayers.filter(p => p.selected);
   
-    if (selectedPlayers.length !== requiredPlayers) {
-      output.innerHTML = `<span style="background:#c0392b; color:white; padding:10px; border-radius:4px; display:block;">❌ HATA: Maç için tam olarak ${requiredPlayers} oyuncu seçmelisiniz. (Şu an ${selectedPlayers.length} seçili)</span>`;
+    if (validatedSelectedPlayerCollection.length !== requiredTotalPlayerLimit) {
+      targetOutputElementNode.innerHTML = `<span style="background:#c0392b; color:white; padding:10px; border-radius:4px; display:block;">HATA: Maç simülasyonu için tam olarak ${requiredTotalPlayerLimit} oyuncu seçilmelidir. Lütfen geçerli bir seçim yapın (Şu anki seçiminiz: ${validatedSelectedPlayerCollection.length}).</span>`;
       return;
     }
   
-    output.innerHTML = '<div style="padding: 15px; font-weight:bold;">Tüm varyasyonlar hesaplanıyor, lütfen bekleyin... ⏳</div>';
+    targetOutputElementNode.innerHTML = '<div style="padding: 15px; font-weight:bold;">Algoritma çalıştırılıyor, tüm kombinasyonlar optimize ediliyor. Lütfen bekleyiniz...</div>';
 
     setTimeout(() => {
         try {
-          const validSquads = getAllSquads(selectedPlayers, format, forceFill, havaLowPriority);
+          const finalValidSquadResults = getAllSquads(validatedSelectedPlayerCollection, specifiedFormatConstraint, forceFillConditionValue, havaLowPriorityConditionValue);
 
-          if (!validSquads || validSquads.length === 0) {
-              let gkCount = 0;
-              selectedPlayers.forEach(p => {
-                  if (p.bannedPositions && p.bannedPositions.includes('GK')) return;
-                  if (p.mainPos === 'GK' || (p.secondaryPositions && p.secondaryPositions.some(sp => sp.pos === 'GK'))) gkCount++;
+          if (!finalValidSquadResults || finalValidSquadResults.length === 0) {
+              let detectedGKAvailabilityCount = 0;
+              validatedSelectedPlayerCollection.forEach(pObj => {
+                  if (pObj.bannedPositions && pObj.bannedPositions.includes('GK')) return;
+                  if (pObj.mainPos === 'GK' || (pObj.secondaryPositions && pObj.secondaryPositions.some(spInfo => spInfo.pos === 'GK'))) detectedGKAvailabilityCount++;
               });
               
-              if (gkCount < 2 && !forceFill) {
-                  output.innerHTML = `<span style="background:#c0392b; color:white; padding:15px; border-radius:4px; line-height:1.6; display:block;">❌ <b>TAKIM BULUNAMADI! (KALECİ EKSİĞİ)</b><br>Kadro kurmak için en az 2 kaleciye (veya yan mevkisi kaleci olan oyuncuya) ihtiyaç var. Şu an seçili oyunculardan sadece <b>${gkCount} kişi</b> kaleye geçebiliyor.<br><br>Lütfen havuza kaleci ekleyin, kaleci oynamayı veto edenlerin yasağını kaldırın veya <i>'Her Zaman Kadro Bul'</i> seçeneğini işaretleyin.</span>`;
+              if (detectedGKAvailabilityCount < 2 && !forceFillConditionValue) {
+                  targetOutputElementNode.innerHTML = `<span style="background:#c0392b; color:white; padding:15px; border-radius:4px; line-height:1.6; display:block;"><b>OPTİMİZASYON HATASI: Yetersiz Kaleci</b><br>Kadro kurmak için en az 2 kaleciye veya kalecilik oynayabilecek yan mevkiye sahip oyuncuya ihtiyaç vardır. Şu an havuzda kalecilik yetkisi bulunan yalnızca <b>${detectedGKAvailabilityCount} kişi</b> mevcut.<br><br>Lütfen havuza yeni bir kaleci ekleyin, mevcut oyunculardan kalede oynamayı reddedenlerin yetkisini açın veya <i>'Her Zaman Kadro Bul'</i> özelliğini aktif edin.</span>`;
               } else {
-                  output.innerHTML = `<span style="background:#c0392b; color:white; padding:15px; border-radius:4px; line-height:1.6; display:block;">❌ <b>TAKIM BULUNAMADI!</b><br>Seçilen oyuncuların 'Kapalı (Kırmızı X)' mevkileri, yetersiz yan mevkileri <b>veya sistemin belirlediği Dinamik Hedef Kalite barajı</b> yüzünden geçerli bir diziliş üretilemiyor. Lütfen veto edilen mevkileri azaltın veya <i>'Her Zaman Kadro Bul'</i> ayarını işaretleyin.</span>`;
+                  targetOutputElementNode.innerHTML = `<span style="background:#c0392b; color:white; padding:15px; border-radius:4px; line-height:1.6; display:block;"><b>OPTİMİZASYON HATASI: Geçerli Kombinasyon Bulunamadı</b><br>Oyuncuların belirlediği formasyon yasakları (Kırmızı X ile işaretlenenler), yetersiz yan mevkiler veya sistemin asgari 'Dinamik Hedef Kalite' eşiği gereksinimi sebebiyle hiçbir uygun formasyon eşleştirilemedi. İşlemi tamamlamak için lütfen mevki kısıtlamalarını esnetin veya <i>'Her Zaman Kadro Bul'</i> parametresini işaretleyiniz.</span>`;
               }
               return;
           }
 
-          simResults = validSquads.slice(0, 5).map(sq => ({
-              original: JSON.parse(JSON.stringify(sq)),
-              active: JSON.parse(JSON.stringify(sq))
+          simResults = finalValidSquadResults.slice(0, 5).map(squadItemData => ({
+              original: JSON.parse(JSON.stringify(squadItemData)),
+              active: JSON.parse(JSON.stringify(squadItemData))
           }));
           simCharts = {};
           
-          let html = `<h3>📊 EN DENGELİ KADROLAR (Toplam ${validSquads.length} İhtimal Bulundu)</h3><div id="sim-cards-main-container">`;
+          let compiledOutputHTMLStream = `<h3>EN DENGELİ KADROLAR (Toplam ${finalValidSquadResults.length} İhtimal Bulundu)</h3><div id="sim-cards-main-container">`;
 
           for(let index = 0; index < simResults.length; index++) {
-              html += `<div id="sim-card-container-${index}"></div>`;
+              compiledOutputHTMLStream += `<div id="sim-card-container-${index}"></div>`;
           }
           
-          html += `</div>`; 
+          compiledOutputHTMLStream += `</div>`; 
 
-          if (validSquads.length > 5) {
-              html += `<div style="margin-top: 30px;"><h4 style="border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">📋 DİĞER ALTERNATİF KADROLAR (${validSquads.length - 5} Adet)</h4><div style="display: flex; flex-direction: column; gap: 10px;">`;
-              for (let i = 5; i < validSquads.length; i++) {
-                  const data = validSquads[i];
-                  const formatPlayer = p => `<span style="white-space:nowrap;">${p.player.shortName || p.player.firstName} <b style="color:${getStatColor(p.pOvr)}">(${p.slot})</b></span>`;
-                  const aNames = data.lineupA.lineup.map(formatPlayer).join(', ');
-                  const bNames = data.lineupB.lineup.map(formatPlayer).join(', ');
+          if (finalValidSquadResults.length > 5) {
+              compiledOutputHTMLStream += `<div style="margin-top: 30px;"><h4 style="border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">DİĞER ALTERNATİF KADROLAR (${finalValidSquadResults.length - 5} Adet)</h4><div style="display: flex; flex-direction: column; gap: 10px;">`;
+              for (let i = 5; i < finalValidSquadResults.length; i++) {
+                  const dataContextDef = finalValidSquadResults[i];
+                  const formattingStructureHelper = formattingP => `<span style="white-space:nowrap;">${formattingP.player.shortName || formattingP.player.firstName} <b style="color:${getStatColor(formattingP.pOvr)}">(${formattingP.slot})</b></span>`;
+                  const listedTeamANames = dataContextDef.lineupA.lineup.map(formattingStructureHelper).join(', ');
+                  const listedTeamBNames = dataContextDef.lineupB.lineup.map(formattingStructureHelper).join(', ');
                   
-                  html += `
+                  compiledOutputHTMLStream += `
                   <div class="sim-result-card" style="padding: 12px; margin-bottom:0;">
                       <div class="sim-alt-card">
                           <div style="min-width: 40px; font-weight: bold; color: #f1c40f; font-size: 1.1em;">#${i + 1}</div>
                           <div style="flex: 1; line-height: 1.6;">
-                              <div style="margin-bottom: 6px;"><b style="color: #3498db;">A Takımı (${data.lineupA.formationName}):</b> <span style="font-size:0.95em;">${aNames}</span></div>
-                              <div><b style="color: #e74c3c;">B Takımı (${data.lineupB.formationName}):</b> <span style="font-size:0.95em;">${bNames}</span></div>
-                              <div style="font-size:0.85em; color:var(--text-muted); margin-top: 4px;">Denge Skoru: ${(data.rawPenalty || data.penalty || 0).toFixed(0)}</div>
+                              <div style="margin-bottom: 6px;"><b style="color: #3498db;">A Takımı (${dataContextDef.lineupA.formationName}):</b> <span style="font-size:0.95em;">${listedTeamANames}</span></div>
+                              <div><b style="color: #e74c3c;">B Takımı (${dataContextDef.lineupB.formationName}):</b> <span style="font-size:0.95em;">${listedTeamBNames}</span></div>
+                              <div style="font-size:0.85em; color:var(--text-muted); margin-top: 4px;">Denge Skoru: ${(dataContextDef.rawPenalty || dataContextDef.penalty || 0).toFixed(0)}</div>
                           </div>
                       </div>
                   </div>`;
               }
-              html += `</div></div>`;
+              compiledOutputHTMLStream += `</div></div>`;
           }
 
-          output.innerHTML = html;
+          targetOutputElementNode.innerHTML = compiledOutputHTMLStream;
 
           for(let index = 0; index < simResults.length; index++) {
               renderSimCard(index);
           }
           
-        } catch (err) { output.innerHTML = `<span style="background:#c0392b; color:white; padding:10px; border-radius:4px; display:block;">❌ HATA: ${err.message}</span>`; }
+        } catch (simErrorObj) { targetOutputElementNode.innerHTML = `<span style="background:#c0392b; color:white; padding:10px; border-radius:4px; display:block;">HATA: Simülasyon sırasında kritik bir işlem başarısız oldu. Açıklama: ${simErrorObj.message}</span>`; }
     }, 50);
 }
 
-function renderRadarChart(playerId) {
-    if (chartInstances[playerId]) return; 
-    const player = currentPlayers.find(p => String(p.id) === String(playerId)); if(!player) return;
-    const canvas = document.getElementById(`chart-${playerId}`); if(!canvas) return;
+function renderRadarChart(assignedPlayerId) {
+    if (chartInstances[assignedPlayerId]) return; 
+    const playerContextDef = currentPlayers.find(p => String(p.id) === String(assignedPlayerId)); if(!playerContextDef) return;
+    const requiredCanvasReferenceNode = document.getElementById(`chart-${assignedPlayerId}`); if(!requiredCanvasReferenceNode) return;
     
-    const eff = getEffectivePlayerInfo(player, false);
-    const isActiveGK = getBasePosition(eff.active) === 'GK';
+    const acquiredEffectiveDataObj = getEffectivePlayerInfo(playerContextDef, false);
+    const booleanIsActiveGoalKeeper = getBasePosition(acquiredEffectiveDataObj.active) === 'GK';
 
-    const sutValue = player.stats.sut !== undefined ? player.stats.sut : (player.stats.şut || 0);
-    const sutKValue = player.stats.sutKarsilama || 0;
-    const firsatValue = player.stats.firsat !== undefined ? player.stats.firsat : (player.stats.fırsat || 0);
+    const normalizedSutEval = playerContextDef.stats.sut !== undefined ? playerContextDef.stats.sut : (playerContextDef.stats.şut || 0);
+    const normalizedSutKarsilamaEval = playerContextDef.stats.sutKarsilama || 0;
+    const normalizedFirsatEval = playerContextDef.stats.firsat !== undefined ? playerContextDef.stats.firsat : (playerContextDef.stats.fırsat || 0);
     
-    const labels = isActiveGK ? ['Pas D.', 'Savunma', 'Şut K.', 'Dribling', 'Fırsat Y.', 'Hava'] : ['Pas D.', 'Savunma', 'Şut', 'Dribling', 'Fırsat Y.', 'Hava'];
-    const data = isActiveGK ? [player.stats.pas, player.stats.savunma, sutKValue, player.stats.dribling, firsatValue, player.stats.hava] : [player.stats.pas, player.stats.savunma, sutValue, player.stats.dribling, firsatValue, player.stats.hava];
+    const graphChartLabelsInfo = booleanIsActiveGoalKeeper ? ['Pas D.', 'Savunma', 'Şut K.', 'Dribling', 'Fırsat Y.', 'Hava'] : ['Pas D.', 'Savunma', 'Şut', 'Dribling', 'Fırsat Y.', 'Hava'];
+    const graphChartDatapointsInfo = booleanIsActiveGoalKeeper ? [playerContextDef.stats.pas, playerContextDef.stats.savunma, normalizedSutKarsilamaEval, playerContextDef.stats.dribling, normalizedFirsatEval, playerContextDef.stats.hava] : [playerContextDef.stats.pas, playerContextDef.stats.savunma, normalizedSutEval, playerContextDef.stats.dribling, normalizedFirsatEval, playerContextDef.stats.hava];
     
-    chartInstances[playerId] = new Chart(canvas.getContext('2d'), { 
+    chartInstances[assignedPlayerId] = new Chart(requiredCanvasReferenceNode.getContext('2d'), { 
         type: 'radar', 
-        data: { labels: labels, datasets: [{ label: 'Profil', data: data, backgroundColor: 'rgba(0, 210, 211, 0.25)', borderColor: '#00d2d3', pointBackgroundColor: '#1dd1a1', borderWidth: 2 }] }, 
+        data: { labels: graphChartLabelsInfo, datasets: [{ label: 'Profil Performansı', data: graphChartDatapointsInfo, backgroundColor: 'rgba(0, 210, 211, 0.25)', borderColor: '#00d2d3', pointBackgroundColor: '#1dd1a1', borderWidth: 2 }] }, 
         options: { 
             layout: { padding: 25 }, 
             maintainAspectRatio: false, 
@@ -1717,79 +1762,111 @@ function renderRadarChart(playerId) {
     });
 }
 
-function editPlayer(id) {
-    const player = currentPlayers.find(p => String(p.id) === String(id)); if (!player) return;
+function initializePlayerEditSequence(selectedPlayerId) {
+    const playerContext = currentPlayers.find(p => String(p.id) === String(selectedPlayerId)); 
+    if (!playerContext) return;
     
-    const clonedSecPositions = JSON.parse(JSON.stringify(player.secondaryPositions || []));
+    // Düzenlemeye başlamadan önce formdaki ve haritadaki sızıntıları tamamen temizler
+    resetPlayerFormUI();
     
-    editingPlayerId = player.id; 
-    const safeSet = (elemId, val) => { const el = document.getElementById(elemId); if (el) el.value = val; };
-    safeSet('pName', player.firstName || player.name.split(' ')[0]);
-    safeSet('pLastName', player.lastName || player.name.split(' ').slice(1).join(' ').replace(' 🧪', ''));
-    const pShortNameEl = document.getElementById('pShortName'); if (pShortNameEl) { pShortNameEl.value = player.shortName || ""; }
-    safeSet('pMainPos', getBasePosition(player.mainPos)); 
-    safeSet('pCond', player.condition); safeSet('sPas', player.stats.pas || 0); safeSet('sSavunma', player.stats.savunma || 0); safeSet('sSut', player.stats.sut !== undefined ? player.stats.sut : (player.stats.şut || 0)); safeSet('sDribling', player.stats.dribling || 0); safeSet('sFirsat', player.stats.firsat !== undefined ? player.stats.firsat : (player.stats.fırsat || 0)); safeSet('sHava', player.stats.hava || 0); safeSet('sSutKar', player.stats.sutKarsilama || 0);
+    editingPlayerId = playerContext.id; 
+    const inputAssigner = (elemId, desiredVal) => { const el = document.getElementById(elemId); if (el) el.value = desiredVal; };
+    
+    inputAssigner('pName', playerContext.firstName || playerContext.name.split(' ')[0]);
+    inputAssigner('pLastName', playerContext.lastName || playerContext.name.split(' ').slice(1).join(' ').replace('  ', ''));
+    inputAssigner('pShortName', playerContext.shortName || "");
+    inputAssigner('pMainPos', getBasePosition(playerContext.mainPos)); 
+    inputAssigner('pCond', playerContext.condition); 
+    inputAssigner('sPas', playerContext.stats.pas || 0); 
+    inputAssigner('sSavunma', playerContext.stats.savunma || 0); 
+    inputAssigner('sSut', playerContext.stats.sut !== undefined ? playerContext.stats.sut : (playerContext.stats.şut || 0)); 
+    inputAssigner('sDribling', playerContext.stats.dribling || 0); 
+    inputAssigner('sFirsat', playerContext.stats.firsat !== undefined ? playerContext.stats.firsat : (playerContext.stats.fırsat || 0)); 
+    inputAssigner('sHava', playerContext.stats.hava || 0); 
+    inputAssigner('sSutKar', playerContext.stats.sutKarsilama || 0);
+    
     renderPositionMap(); 
     
-    const mainRoleSelect = document.querySelector('.pos-btn-group.main-pos .role-select');
-    if (mainRoleSelect && player.role && player.role !== 'null') {
-        mainRoleSelect.value = player.role;
-        mainRoleSelect.parentElement.dataset.manual = 'true';
+    const mainRoleSelector = document.querySelector('.pos-btn-group.main-pos .role-select');
+    if (mainRoleSelector && playerContext.role && playerContext.role !== 'null') {
+        mainRoleSelector.value = playerContext.role;
+        mainRoleSelector.parentElement.dataset.manual = 'true';
     }
 
-    if (clonedSecPositions) {
-      clonedSecPositions.forEach(sec => {
-        const btnGroup = document.querySelector(`.pos-btn-group[data-pos="${getBasePosition(sec.pos)}"]`);
-        if (btnGroup) { 
-            btnGroup.classList.add('active-sec');
-            const capInput = btnGroup.querySelector('.cap-input'); if (capInput) capInput.value = sec.capacity; 
-            const sel = btnGroup.querySelector('.role-select'); if (sel) { sel.style.display = 'block'; sel.value = (sec.role === 'null') ? '' : sec.role; btnGroup.dataset.manual = 'true'; }
-            const secControls = btnGroup.querySelector('.sec-controls'); if (secControls) secControls.style.display = 'flex';
-        }
-      });
+    const clonedSecondaryArray = JSON.parse(JSON.stringify(playerContext.secondaryPositions || []));
+    if (clonedSecondaryArray) {
+        clonedSecondaryArray.forEach(secItem => {
+            const secGroupNode = document.querySelector(`.pos-btn-group[data-pos="${getBasePosition(secItem.pos)}"]`);
+            if (secGroupNode) { 
+                secGroupNode.classList.add('active-sec');
+                const capInput = secGroupNode.querySelector('.cap-input'); 
+                if (capInput) capInput.value = secItem.capacity; 
+                
+                const roleDropdown = secGroupNode.querySelector('.role-select'); 
+                if (roleDropdown) { 
+                    roleDropdown.style.display = 'block'; 
+                    roleDropdown.value = (secItem.role === 'null') ? '' : secItem.role; 
+                    secGroupNode.dataset.manual = 'true'; 
+                }
+                const controlsPanel = secGroupNode.querySelector('.sec-controls'); 
+                if (controlsPanel) controlsPanel.style.display = 'flex';
+            }
+        });
     }
 
     updateLiveRoles(); 
     updateCondPreview(); 
-    const btn = document.getElementById('btnAddPlayer'); 
-    if (btn) { btn.innerText = "Düzenlemeyi Kaydet ✓"; btn.className = "btn btn-green"; }
     
-    const btnCancel = document.getElementById('btnCancelEdit');
-    if (btnCancel) btnCancel.style.display = 'block';
+    const submitBtn = document.getElementById('btnAddPlayer'); 
+    if (submitBtn) { submitBtn.innerText = "Düzenlemeyi Kaydet"; submitBtn.className = "btn btn-green"; }
     
-    const details = document.getElementById(`details-${id}`); if(details) details.open = false; window.scrollTo({ top: 0, behavior: 'smooth' });
+    const cancelBtn = document.getElementById('btnCancelEdit');
+    if (cancelBtn) cancelBtn.style.display = 'block';
+    
+    const detailPanel = document.getElementById(`details-${selectedPlayerId}`); 
+    if(detailPanel) detailPanel.open = false; 
+    
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function cancelEdit(e) {
-    if(e) e.preventDefault();
+function resetPlayerFormUI() {
+    const inputAssigner = (elementId, value) => { 
+        const element = document.getElementById(elementId); 
+        if (element) element.value = value; 
+    };
+    
+    inputAssigner('pName', "");
+    inputAssigner('pLastName', "");
+    inputAssigner('pShortName', "");
+    inputAssigner('pMainPos', "CB");
+    inputAssigner('pCond', "Tam");
+    
+    ['sPas', 'sSavunma', 'sSut', 'sDribling', 'sFirsat', 'sHava'].forEach(id => inputAssigner(id, 40));
+    inputAssigner('sSutKar', 0);
+
+    // Haritadaki tüm yan mevki seçimlerini ve aktif durumları temizle
+    document.querySelectorAll('.pos-btn-group.active-sec').forEach(node => {
+        node.classList.remove('active-sec');
+        const controlsPanel = node.querySelector('.sec-controls');
+        if (controlsPanel) controlsPanel.style.display = 'none';
+        delete node.dataset.manual;
+    });
+
+    const mainGroupNode = document.querySelector(`.pos-btn-group.main-pos`);
+    if (mainGroupNode) delete mainGroupNode.dataset.manual;
+}
+
+function cancelPlayerEdit(eventPayloadInfo) {
+    if (eventPayloadInfo) eventPayloadInfo.preventDefault();
     editingPlayerId = null;
     
-    const safeSet = (elemId, val) => { const el = document.getElementById(elemId); if (el) el.value = val; };
-    
-    safeSet('pName', "");
-    safeSet('pLastName', "");
-    safeSet('pShortName', "");
-    safeSet('pMainPos', "CB");
-    safeSet('pCond', "Tam");
-    
-    // Varsayılanları 40'a, kaleci kurtarışını 0'a çektik
-    safeSet('sPas', 40);
-    safeSet('sSavunma', 40);
-    safeSet('sSut', 40);
-    safeSet('sDribling', 40);
-    safeSet('sFirsat', 40);
-    safeSet('sHava', 40);
-    safeSet('sSutKar', 0);
+    resetPlayerFormUI(); // Modüler temizleme fonksiyonu çağrıldı
 
-    document.querySelectorAll('.pos-btn-group.active-sec').forEach(btn => btn.classList.remove('active-sec'));
-    const mainGroup = document.querySelector(`.pos-btn-group.main-pos`);
-    if (mainGroup) delete mainGroup.dataset.manual;
-
-    const btn = document.getElementById('btnAddPlayer'); 
-    if(btn) { btn.innerText = "Oyuncuyu Havuza Ekle"; btn.className = "btn btn-green"; }
+    const finalizeBtn = document.getElementById('btnAddPlayer'); 
+    if (finalizeBtn) { finalizeBtn.innerText = "Oyuncuyu Havuza Ekle"; finalizeBtn.className = "btn btn-green"; }
     
-    const btnCancel = document.getElementById('btnCancelEdit');
-    if(btnCancel) btnCancel.style.display = 'none';
+    const cancelBtn = document.getElementById('btnCancelEdit');
+    if (cancelBtn) cancelBtn.style.display = 'none';
 
     renderPositionMap(); 
     updateLiveRoles();

@@ -10,30 +10,24 @@ function isSymmetric(slots) {
     return true;
 }
 
-function isRealistic(d, dm, cm, am, fw, format) {
-    // 5 hatlı yapay yasağı SENİN İSTEĞİNLE tamamen silindi.
+function isRealistic(defCount, dmCount, cmCount, amCount, fwCount, format) {
+    // Formasyon geçerliliği ve yapısal kısıtlamalar
+    if (defCount === 0) return false; 
+    if (defCount === 1 && dmCount === 0 && format >= 6) return false; 
+    if (fwCount === 0 && amCount === 0) return false; 
     
-    // Arkası tamamen boş bırakılamaz
-    if (d === 0) return false; 
-    
-    // Tek stoper bırakılıyorsa kesinlikle destekleyici ön libero (DM) olmak zorunda
-    if (d === 1 && dm === 0 && format >= 6) return false; 
-    
-    // İleride kimse yoksa takım maça çıkamaz
-    if (fw === 0 && am === 0) return false; 
-    
-    // Aşırı yığılma engeli
-    const outfield = format - 1;
-    if (d + dm > outfield - 1) return false; 
-    if (fw + am > outfield - 1) return false; 
+    // Yığılma limitleri
+    const outfieldPlayers = format - 1;
+    if (defCount + dmCount > outfieldPlayers - 1) return false; 
+    if (fwCount + amCount > outfieldPlayers - 1) return false; 
 
     return true;
 }
 
 function generateAllFormations() {
-    const ALL_FORMATIONS = [];
+    const allFormations = [];
 
-    const lines = {
+    const positionalLines = {
         DEF: { 0: [[]], 1: [["CB"]], 2: [["LCB", "RCB"], ["LB", "RB"]], 3: [["LCB", "CB", "RCB"], ["LB", "CB", "RB"]], 4: [["LB", "LCB", "RCB", "RB"], ["LWB", "LCB", "RCB", "RWB"]], 5: [["LB", "LCB", "CB", "RCB", "RB"], ["LWB", "LCB", "CB", "RCB", "RWB"]] },
         DM: { 0: [[]], 1: [["DM"]], 2: [["LDM", "RDM"]], 3: [["LDM", "DM", "RDM"]] },
         CM: { 0: [[]], 1: [["CM"]], 2: [["LCM", "RCM"], ["LM", "RM"]], 3: [["LCM", "CM", "RCM"], ["LM", "CM", "RM"]], 4: [["LM", "LCM", "RCM", "RM"]] },
@@ -42,35 +36,39 @@ function generateAllFormations() {
     };
 
     for (let format = 5; format <= 11; format++) {
-        const targetN = format - 1; 
-        for (let d = 0; d <= 5; d++) {
-            for (let dm = 0; dm <= 3; dm++) {
-                for (let cm = 0; cm <= 4; cm++) {
-                    for (let am = 0; am <= 4; am++) {
-                        for (let fw = 0; fw <= 3; fw++) {
-                            if (d + dm + cm + am + fw === targetN) {
+        const targetOutfieldCount = format - 1; 
+        for (let defCount = 0; defCount <= 5; defCount++) {
+            for (let dmCount = 0; dmCount <= 3; dmCount++) {
+                for (let cmCount = 0; cmCount <= 4; cmCount++) {
+                    for (let amCount = 0; amCount <= 4; amCount++) {
+                        for (let fwCount = 0; fwCount <= 3; fwCount++) {
+                            if (defCount + dmCount + cmCount + amCount + fwCount === targetOutfieldCount) {
                                 
-                                if (!isRealistic(d, dm, cm, am, fw, format)) continue;
+                                if (!isRealistic(defCount, dmCount, cmCount, amCount, fwCount, format)) continue;
 
-                                const parts = [d, dm, cm, am, fw];
-                                const nameParts = [];
+                                const counts = [defCount, dmCount, cmCount, amCount, fwCount];
+                                const formationNameParts = [];
                                 for (let i = 0; i < 5; i++) {
-                                    if (i === 0 || i === 4) nameParts.push(parts[i]); 
-                                    else if (parts[i] !== 0) nameParts.push(parts[i]); 
+                                    if (i === 0 || i === 4) formationNameParts.push(counts[i]); 
+                                    else if (counts[i] !== 0) formationNameParts.push(counts[i]); 
                                 }
-                                const formationName = nameParts.join('-');
+                                const formationName = formationNameParts.join('-');
 
                                 const variants = [];
-                                let vId = 1;
+                                let variantIdCounter = 1;
 
-                                lines.DEF[d].forEach(defArr => {
-                                    lines.DM[dm].forEach(dmArr => {
-                                        lines.CM[cm].forEach(cmArr => {
-                                            lines.AM[am].forEach(amArr => {
-                                                lines.FW[fw].forEach(fwArr => {
+                                positionalLines.DEF[defCount].forEach(defArr => {
+                                    positionalLines.DM[dmCount].forEach(dmArr => {
+                                        positionalLines.CM[cmCount].forEach(cmArr => {
+                                            positionalLines.AM[amCount].forEach(amArr => {
+                                                positionalLines.FW[fwCount].forEach(fwArr => {
                                                     const slots = ["GK", ...defArr, ...dmArr, ...cmArr, ...amArr, ...fwArr];
                                                     if (isSymmetric(slots)) {
-                                                        variants.push({ id: `f${format}_${d}${dm}${cm}${am}${fw}_${vId++}`, desc: slots.slice(1).join(', '), slots: slots });
+                                                        variants.push({ 
+                                                            id: `f${format}_${defCount}${dmCount}${cmCount}${amCount}${fwCount}_${variantIdCounter++}`, 
+                                                            desc: slots.slice(1).join(', '), 
+                                                            slots: slots 
+                                                        });
                                                     }
                                                 });
                                             });
@@ -78,7 +76,7 @@ function generateAllFormations() {
                                     });
                                 });
 
-                                if (variants.length > 0) ALL_FORMATIONS.push({ format, name: formationName, variants });
+                                if (variants.length > 0) allFormations.push({ format, name: formationName, variants });
                             }
                         }
                     }
@@ -86,7 +84,7 @@ function generateAllFormations() {
             }
         }
     }
-    return ALL_FORMATIONS;
+    return allFormations;
 }
 
 export const FORMATIONS = generateAllFormations();

@@ -13,13 +13,13 @@ const POS_COORDS = {
     "FW": [2, 0], "LFW": [1, 0], "RFW": [3, 0]
 };
 
-// 🔥 SENİN ÇİZDİĞİN 5x5 İHTİYAÇ MATRİSİ 🔥
+// Formasyon Bölgesel İhtiyaç Matrisi (5x5 Grid)
 const GRID_NEEDS = [
-    [0, 15, 30, 15, 0],   // Y=0 (Hücum - FW Hattı)
-    [0, 20, 35, 20, 0], // Y=1 (AM Hattı)
-    [0, 25, 40, 25, 0], // Y=2 (CM Hattı)
-    [5, 30, 50, 30, 5], // Y=3 (DM Hattı)
-    [10, 30, 55, 30, 10]  // Y=4 (Savunma - CB Hattı)
+    [0, 15, 30, 15, 0], 
+    [0, 20, 35, 20, 0], 
+    [0, 25, 40, 25, 0], 
+    [5, 30, 50, 30, 5], 
+    [10, 30, 55, 30, 10]
 ];
 
 function getBasePosition(slot) {
@@ -29,22 +29,24 @@ function getBasePosition(slot) {
   return map[slot] || slot;
 }
 
-// 🛡️ NULL HATASINI KÖKTEN ÇÖZEN YEREL ROL BULUCU
+// Oyuncu özelliklerine göre uygun rolü hesaplama (Varsayılan Atama)
 function getBestRoleForStatsLocal(pos, stats) {
     const roles = ROLE_WEIGHTS[pos];
     if (!roles) return "Bilinmeyen Rol";
+    
     let bestRole = Object.keys(roles)[0];
     let maxAverage = -1;
     for (const [roleName, weights] of Object.entries(roles)) {
-        let totalScore = 0, totalWeight = 0;
+        let totalScore = 0;
+        let totalWeight = 0;
         for (const [statName, weightVal] of Object.entries(weights)) {
             if (weightVal > 0) {
                 totalScore += (stats[statName] || 0) * weightVal;
                 totalWeight += weightVal;
             }
         }
-        const avg = totalWeight > 0 ? (totalScore / totalWeight) : 0;
-        if (avg > maxAverage) { maxAverage = avg; bestRole = roleName; }
+        const average = totalWeight > 0 ? (totalScore / totalWeight) : 0;
+        if (average > maxAverage) { maxAverage = average; bestRole = roleName; }
     }
     return bestRole;
 }
@@ -58,30 +60,38 @@ function getPlayerCapacityForSlot(player, slot, forceFill) {
 
     const mainBase = getBasePosition(player.mainPos);
     if (mainBase === baseSlot) {
-        let r = player.role;
-        if (!r || r === 'null') r = getBestRoleForStatsLocal(baseSlot, player.stats);
-        return { cap: 100, isMain: true, isSec: false, outOfPos: false, invalid: false, banned: false, role: r };
+        let assignedRole = player.role;
+        if (!assignedRole || assignedRole === 'null') assignedRole = getBestRoleForStatsLocal(baseSlot, player.stats);
+        return { cap: 100, isMain: true, isSec: false, outOfPos: false, invalid: false, banned: false, role: assignedRole };
     }
     
-    const sec = player.secondaryPositions?.find(sp => getBasePosition(sp.pos) === baseSlot);
-    if (sec) {
-        let r = sec.role;
-        if (!r || r === 'null') r = getBestRoleForStatsLocal(baseSlot, player.stats);
-        return { cap: Math.max(25, sec.capacity), isMain: false, isSec: true, outOfPos: false, invalid: false, banned: false, role: r };
+    const secondaryPos = player.secondaryPositions?.find(sp => getBasePosition(sp.pos) === baseSlot);
+    if (secondaryPos) {
+        let assignedRole = secondaryPos.role;
+        if (!assignedRole || assignedRole === 'null') assignedRole = getBestRoleForStatsLocal(baseSlot, player.stats);
+        return { cap: Math.max(25, secondaryPos.capacity), isMain: false, isSec: true, outOfPos: false, invalid: false, banned: false, role: assignedRole };
     }
     
     if (forceFill) return { cap: 25, isMain: false, isSec: false, outOfPos: true, invalid: false, banned: false, role: getBestRoleForStatsLocal(baseSlot, player.stats) };
+    
     return { cap: 0, isMain: false, isSec: false, outOfPos: true, invalid: true, banned: false, role: getBestRoleForStatsLocal(baseSlot, player.stats) };
 }
 
 function calculateRoleOVR(player, pos, role) {
     const weights = ROLE_WEIGHTS[pos]?.[role];
-    const getStat = s => player.stats[s] ?? (s === 'sut' ? player.stats.şut : s === 'firsat' ? player.stats.fırsat : 0);
+    const getStat = stat => player.stats[stat] ?? (stat === 'sut' ? player.stats.şut : stat === 'firsat' ? player.stats.fırsat : 0);
     let baseOvr = 0;
+    
     if (weights) {
-        let ts = 0, tw = 0;
-        for (const [s, w] of Object.entries(weights)) { if (w > 0) { ts += getStat(s) * w; tw += w; } }
-        if (tw > 0) baseOvr = Math.round(ts / tw);
+        let totalScore = 0;
+        let totalWeight = 0;
+        for (const [statName, weightVal] of Object.entries(weights)) { 
+            if (weightVal > 0) { 
+                totalScore += getStat(statName) * weightVal; 
+                totalWeight += weightVal; 
+            } 
+        }
+        if (totalWeight > 0) baseOvr = Math.round(totalScore / totalWeight);
     } else {
         baseOvr = Math.round(((player.stats.pas || 0) + (player.stats.savunma || 0) + (player.stats.dribling || 0) + (player.stats.hava || 0) + getStat('firsat') + (pos === 'GK' ? player.stats.sutKarsilama || 0 : getStat('sut'))) / 6);
     }
@@ -106,146 +116,145 @@ function calculateGridPenalty(assignment) {
         const coords = POS_COORDS[item.slot];
         if (!coords) return;
         
-        const cx = coords[0];
-        const cy = coords[1];
+        const centerX = coords[0];
+        const centerY = coords[1];
 
-        const isAtk = isAttackerRole(item.basePos, item.role);
-        const multiplier = isAtk ? 0.6 : 1.0;
+        const isAttacker = isAttackerRole(item.basePos, item.role);
+        const roleMultiplier = isAttacker ? 0.6 : 1.0;
 
         for (let y = 0; y < 5; y++) {
             for (let x = 0; x < 5; x++) {
-                const dx = Math.abs(x - cx);
-                const dy = Math.abs(y - cy);
-                let val = 0;
+                const deltaX = Math.abs(x - centerX);
+                const deltaY = Math.abs(y - centerY);
+                let penaltyValue = 0;
 
-                if (dx === 0 && dy === 0) val = 60; 
-                else if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) val = 30; 
-                else if (dx === 1 && dy === 1) val = 15; 
+                if (deltaX === 0 && deltaY === 0) penaltyValue = 60; 
+                else if ((deltaX === 1 && deltaY === 0) || (deltaX === 0 && deltaY === 1)) penaltyValue = 30; 
+                else if (deltaX === 1 && deltaY === 1) penaltyValue = 15; 
 
-                coverage[y][x] += val * multiplier;
+                coverage[y][x] += penaltyValue * roleMultiplier;
             }
         }
     });
 
-    let penalty = 0;
+    let penaltyScore = 0;
     for (let y = 0; y < 5; y++) {
         for (let x = 0; x < 5; x++) {
             const deficit = GRID_NEEDS[y][x] - coverage[y][x];
             if (deficit > 0) {
-                // Bölgeye özel önem çarpanı (Savunma ve Ön Libero hattını boş bırakmayı ağır cezalandırır)
                 let rowMultiplier = 1.0;
-                if (y === 3) rowMultiplier = 2.0; // DM hattı (x2 Ceza)
-                if (y === 4) rowMultiplier = 3.5; // Savunma hattı (x3.5 Ceza)
+                if (y === 3) rowMultiplier = 2.0; 
+                if (y === 4) rowMultiplier = 3.5; 
                 
-                // Ana formül: (Açık - Tolerans)^2.8 * 8 * Bölge Çarpanı
-                penalty += Math.pow(Math.max(0, deficit - 5), 2.8) * 8 * rowMultiplier;
+                penaltyScore += Math.pow(Math.max(0, deficit - 5), 2.8) * 8 * rowMultiplier;
             }
         }
     }
-    return penalty;
+    return penaltyScore;
 }
 
-let PRE_COST = [];
-let PRE_META = [];
-let PRE_OVR = [];
-const MAX_N = 14;
-const globalCost = Array.from({length: MAX_N}, () => new Int32Array(MAX_N));
-const globalDp = new Int32Array(1 << MAX_N);
-const globalParent = new Int32Array(1 << MAX_N);
-const globalChoice = new Int32Array(1 << MAX_N);
-const bits = new Int32Array(1 << MAX_N);
-for(let i = 1; i < (1 << MAX_N); i++) bits[i] = bits[i >> 1] + (i & 1);
+let precomputedCosts = [];
+let precomputedMeta = [];
+let precomputedOvr = [];
+const MAX_PLAYER_COUNT = 14;
+const dynamicCostMatrix = Array.from({length: MAX_PLAYER_COUNT}, () => new Int32Array(MAX_PLAYER_COUNT));
+const dpState = new Int32Array(1 << MAX_PLAYER_COUNT);
+const dpParent = new Int32Array(1 << MAX_PLAYER_COUNT);
+const dpChoice = new Int32Array(1 << MAX_PLAYER_COUNT);
+const bitCounts = new Int32Array(1 << MAX_PLAYER_COUNT);
+for(let i = 1; i < (1 << MAX_PLAYER_COUNT); i++) bitCounts[i] = bitCounts[i >> 1] + (i & 1);
 
 export function initFormationMatcher(poolPlayers, forceFill) {
-    PRE_COST = new Int32Array(MAX_N * 24);
-    PRE_META = new Array(MAX_N * 24);
-    PRE_OVR = new Int32Array(MAX_N * 24);
+    precomputedCosts = new Int32Array(MAX_PLAYER_COUNT * 24);
+    precomputedMeta = new Array(MAX_PLAYER_COUNT * 24);
+    precomputedOvr = new Int32Array(MAX_PLAYER_COUNT * 24);
 
-    for(let i=0; i<poolPlayers.length; i++) {
-        let p = poolPlayers[i];
-        let pId = p._internal_id;
-        for(let j=0; j<24; j++) {
+    for(let i = 0; i < poolPlayers.length; i++) {
+        let player = poolPlayers[i];
+        let playerId = player._internal_id;
+        for(let j = 0; j < 24; j++) {
             let slotName = SLOT_NAMES[j];
-            let match = getPlayerCapacityForSlot(p, slotName, forceFill);
-            PRE_META[pId * 24 + j] = match;
+            let matchData = getPlayerCapacityForSlot(player, slotName, forceFill);
+            precomputedMeta[playerId * 24 + j] = matchData;
             
-            if (match.banned) {
-                PRE_COST[pId * 24 + j] = -1000000000;
-                PRE_OVR[pId * 24 + j] = 0;
-            } else if (match.invalid) {
-                PRE_COST[pId * 24 + j] = -9999999;
-                PRE_OVR[pId * 24 + j] = 0;
+            if (matchData.banned) {
+                precomputedCosts[playerId * 24 + j] = -1000000000;
+                precomputedOvr[playerId * 24 + j] = 0;
+            } else if (matchData.invalid) {
+                precomputedCosts[playerId * 24 + j] = -9999999;
+                precomputedOvr[playerId * 24 + j] = 0;
             } else {
-                let pOVR = calculateRoleOVR(p, getBasePosition(slotName), match.role);
-                PRE_OVR[pId * 24 + j] = pOVR;
-                PRE_COST[pId * 24 + j] = Math.round(pOVR * match.cap);
+                let calculatedOvr = calculateRoleOVR(player, getBasePosition(slotName), matchData.role);
+                precomputedOvr[playerId * 24 + j] = calculatedOvr;
+                precomputedCosts[playerId * 24 + j] = Math.round(calculatedOvr * matchData.cap);
             }
         }
     }
 }
 
 function solveAssignment(teamPlayers, slots, forceFill) {
-    const N = teamPlayers.length;
-    if (N > MAX_N || N !== slots.length) return null; 
+    const playerCount = teamPlayers.length;
+    if (playerCount > MAX_PLAYER_COUNT || playerCount !== slots.length) return null; 
 
-    for (let p = 0; p < N; p++) {
-        let pId = teamPlayers[p]._internal_id;
-        for (let s = 0; s < N; s++) {
-            let sId = SLOT_IDX[slots[s]];
-            globalCost[p][s] = PRE_COST[pId * 24 + sId];
+    for (let p = 0; p < playerCount; p++) {
+        let playerId = teamPlayers[p]._internal_id;
+        for (let s = 0; s < playerCount; s++) {
+            let slotId = SLOT_IDX[slots[s]];
+            dynamicCostMatrix[p][s] = precomputedCosts[playerId * 24 + slotId];
         }
     }
 
-    const maxMask = 1 << N;
-    globalDp.fill(-1000000000, 0, maxMask);
-    globalParent.fill(-1, 0, maxMask);
-    globalChoice.fill(-1, 0, maxMask);
-    globalDp[0] = 0;
+    const maxMask = 1 << playerCount;
+    dpState.fill(-1000000000, 0, maxMask);
+    dpParent.fill(-1, 0, maxMask);
+    dpChoice.fill(-1, 0, maxMask);
+    dpState[0] = 0;
 
     for (let mask = 0; mask < maxMask; mask++) {
-        if (globalDp[mask] <= -500000000) continue; 
-        const p = bits[mask];
-        if (p === N) continue;
+        if (dpState[mask] <= -500000000) continue; 
+        const p = bitCounts[mask];
+        if (p === playerCount) continue;
 
-        for (let s = 0; s < N; s++) {
+        for (let s = 0; s < playerCount; s++) {
             if ((mask & (1 << s)) === 0) {
                 const nextMask = mask | (1 << s);
-                const newScore = globalDp[mask] + globalCost[p][s];
-                if (newScore > globalDp[nextMask]) {
-                    globalDp[nextMask] = newScore;
-                    globalParent[nextMask] = mask;
-                    globalChoice[nextMask] = s;
+                const newScore = dpState[mask] + dynamicCostMatrix[p][s];
+                if (newScore > dpState[nextMask]) {
+                    dpState[nextMask] = newScore;
+                    dpParent[nextMask] = mask;
+                    dpChoice[nextMask] = s;
                 }
             }
         }
     }
 
-    let curr = maxMask - 1;
-    if (globalDp[curr] <= -500000000) return null; 
+    let currentMask = maxMask - 1;
+    if (dpState[currentMask] <= -500000000) return null; 
 
-    const assignment = new Array(N);
-    let p = N - 1;
-    while (curr > 0) {
-        const s = globalChoice[curr];
-        let pId = teamPlayers[p]._internal_id;
-        let sId = SLOT_IDX[slots[s]];
-        let m = PRE_META[pId * 24 + sId];
-        let calcOvr = PRE_OVR[pId * 24 + sId];
+    const assignment = new Array(playerCount);
+    let p = playerCount - 1;
+    
+    while (currentMask > 0) {
+        const s = dpChoice[currentMask];
+        let playerId = teamPlayers[p]._internal_id;
+        let slotId = SLOT_IDX[slots[s]];
+        let metaData = precomputedMeta[playerId * 24 + slotId];
+        let calculatedOvr = precomputedOvr[playerId * 24 + slotId];
         
         assignment[p] = {
             player: teamPlayers[p],
             slot: slots[s],
             basePos: getBasePosition(slots[s]),
-            cap: m.cap,
-            isMain: m.isMain,
-            isSec: m.isSec,
-            outOfPos: m.outOfPos,
-            invalid: m.invalid,
-            banned: m.banned,
-            role: m.role,
-            pOvr: Math.round(calcOvr * (m.cap / 100))
+            cap: metaData.cap,
+            isMain: metaData.isMain,
+            isSec: metaData.isSec,
+            outOfPos: metaData.outOfPos,
+            invalid: metaData.invalid,
+            banned: metaData.banned,
+            role: metaData.role,
+            pOvr: Math.round(calculatedOvr * (metaData.cap / 100))
         };
-        curr = globalParent[curr];
+        currentMask = dpParent[currentMask];
         p--;
     }
     return assignment;
@@ -264,18 +273,17 @@ export function getPerfectLineups(teamPlayers, format, forceFill = false) {
           let invalidCount = 0;
           let bannedCount = 0;
           
-          assignment.forEach(curr => { 
-              if (curr.invalid) invalidCount++;
-              if (curr.banned) bannedCount++;
-              let pId = curr.player._internal_id;
-              let sId = SLOT_IDX[curr.slot];
-              matchScore += PRE_COST[pId * 24 + sId]; 
+          assignment.forEach(currentItem => { 
+              if (currentItem.invalid) invalidCount++;
+              if (currentItem.banned) bannedCount++;
+              let playerId = currentItem.player._internal_id;
+              let slotId = SLOT_IDX[currentItem.slot];
+              matchScore += precomputedCosts[playerId * 24 + slotId]; 
           });
 
           if (bannedCount > 0) return; 
           if (!forceFill && invalidCount > 0) return; 
 
-          // Yeni Taktiksel Açık / Grid Cezası
           const gridPenalty = calculateGridPenalty(assignment);
 
           lineups.push({

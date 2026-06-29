@@ -4,11 +4,13 @@ import { getPerfectLineups, initFormationMatcher } from './formationMatcher.js';
 export function getBestRoleForStats(pos, stats) {
     const roles = ROLE_WEIGHTS[pos];
     if (!roles) return "Bilinmeyen Rol";
+    
     let bestRole = Object.keys(roles)[0];
     let maxAverage = -1;
     
     for (const [roleName, weights] of Object.entries(roles)) {
-      let totalScore = 0, totalWeight = 0;
+      let totalScore = 0;
+      let totalWeight = 0;
       for (const [statName, weightVal] of Object.entries(weights)) {
         if (weightVal > 0) {
           totalScore += (stats[statName] || 0) * weightVal;
@@ -16,59 +18,62 @@ export function getBestRoleForStats(pos, stats) {
         }
       }
       const weightedAverage = totalWeight > 0 ? (totalScore / totalWeight) : 0;
-      if (weightedAverage > maxAverage) { maxAverage = weightedAverage; bestRole = roleName; }
+      if (weightedAverage > maxAverage) { 
+          maxAverage = weightedAverage; 
+          bestRole = roleName; 
+      }
     }
     return bestRole;
 }
 
 export function calculateTeamStatsLineup(lineupArr) {
-  let actual = { pas: 0, savunma: 0, sut: 0, dribling: 0, firsat: 0, hava: 0 };
-  let maximum = { pas: 0, savunma: 0, sut: 0, dribling: 0, firsat: 0, hava: 0 };
+  let actualStats = { pas: 0, savunma: 0, sut: 0, dribling: 0, firsat: 0, hava: 0 };
+  let maxStats = { pas: 0, savunma: 0, sut: 0, dribling: 0, firsat: 0, hava: 0 };
 
   lineupArr.forEach(item => {
     if (item.invalid || !item.player) return; 
     
-    const p = item.player;
-    const role = (item.role && item.role !== 'null') ? item.role : getBestRoleForStats(item.basePos, p.stats);
-    item.role = role; 
+    const player = item.player;
+    const assignedRole = (item.role && item.role !== 'null') ? item.role : getBestRoleForStats(item.basePos, player.stats);
+    item.role = assignedRole; 
     
-    const kapasiteCarpani = item.cap / 100;
-    const kondisyonCarpani = CONDITIONS[p.condition] || 1.0;
-    const weights = ROLE_WEIGHTS[item.basePos]?.[role] || {};
+    const capacityMultiplier = item.cap / 100;
+    const conditionMultiplier = CONDITIONS[player.condition] || 1.0;
+    const weights = ROLE_WEIGHTS[item.basePos]?.[assignedRole] || {};
 
     ['pas', 'savunma', 'sut', 'dribling', 'firsat', 'hava'].forEach(statName => {
-        let hamStat = p.stats[statName] || 0;
-        if(statName === 'sut' && !hamStat) hamStat = p.stats['şut'] || 0;
-        if(statName === 'firsat' && !hamStat) hamStat = p.stats['fırsat'] || 0;
+        let rawStat = player.stats[statName] || 0;
+        if(statName === 'sut' && !rawStat) rawStat = player.stats['şut'] || 0;
+        if(statName === 'firsat' && !rawStat) rawStat = player.stats['fırsat'] || 0;
 
-        let rolAgirligi = (weights[statName] || 0) / 100;
+        let roleWeight = (weights[statName] || 0) / 100;
 
-        let sonKondisyon = kondisyonCarpani;
+        let finalCondition = conditionMultiplier;
         if (item.basePos === 'GK' && !['savunma', 'dribling', 'hava'].includes(statName)) {
-            sonKondisyon = 1.0;
+            finalCondition = 1.0;
         }
 
-        let actKatki = hamStat * rolAgirligi * kapasiteCarpani * sonKondisyon;
-        let maxKatki = 100 * rolAgirligi * 1.0 * 1.0; 
+        let actualContribution = rawStat * roleWeight * capacityMultiplier * finalCondition;
+        let maxContribution = 100 * roleWeight * 1.0 * 1.0; 
 
         if (statName === 'savunma' && item.basePos === 'GK') {
-            let wKar = (weights['sutKarsilama'] || 0) / 100;
-            let sKar = p.stats['sutKarsilama'] || 0;
-            actKatki += sKar * wKar * kapasiteCarpani * 1.0 * 0.5; 
-            maxKatki += 100 * wKar * 1.0 * 1.0 * 0.5; 
+            let shotStoppingWeight = (weights['sutKarsilama'] || 0) / 100;
+            let shotStoppingStat = player.stats['sutKarsilama'] || 0;
+            actualContribution += shotStoppingStat * shotStoppingWeight * capacityMultiplier * 1.0 * 0.5; 
+            maxContribution += 100 * shotStoppingWeight * 1.0 * 1.0 * 0.5; 
         }
 
-        actual[statName] += actKatki;
-        maximum[statName] += maxKatki;
+        actualStats[statName] += actualContribution;
+        maxStats[statName] += maxContribution;
     });
   });
 
   let normalized = {};
-  ['pas', 'savunma', 'sut', 'dribling', 'firsat', 'hava'].forEach(s => {
-      normalized[s] = maximum[s] > 0 ? (actual[s] / maximum[s]) * 100 : 0;
+  ['pas', 'savunma', 'sut', 'dribling', 'firsat', 'hava'].forEach(stat => {
+      normalized[stat] = maxStats[stat] > 0 ? (actualStats[stat] / maxStats[stat]) * 100 : 0;
   });
 
-  return { actual, maximum, normalized };
+  return { actual: actualStats, maximum: maxStats, normalized };
 }
 
 export function calculateBalanceMetrics(normA, normB, invalidCountA, invalidCountB, ovrA, ovrB, lineupA, lineupB, havaLowPriority) {
@@ -82,40 +87,40 @@ export function calculateBalanceMetrics(normA, normB, invalidCountA, invalidCoun
       totalPenalty: 0
   };
 
-  // 1. SAF DENGE (Net OVR x 1000)
+  // 1. Temel Denge (Net OVR farkı bazlı)
   const netDiff = Math.abs(ovrA - ovrB);
   details.netDiffPenalty = netDiff * 1000.0;
   details.netDiffFormula = `|${ovrA.toFixed(2)} - ${ovrB.toFixed(2)}| = ${netDiff.toFixed(2)} * 1000`;
   let penaltyScore = details.netDiffPenalty;
 
-  // 2. KRİTİK ÖZELLİK FARKI CEZASI
-  const calcCliff = (valA, valB, key) => {
-       let rA = Math.round(valA);
-       let rB = Math.round(valB);
-       let diff = Math.abs(rA - rB);
-       let pen = Math.pow(Math.max(0, diff - 5), 3);
-       details.cliffPenalties[key] = { diff: diff, pen: pen };
-       return pen;
+  // 2. Kritik Özellik Farkı Cezası
+  const calculateCliffPenalty = (valA, valB, key) => {
+       const roundedA = Math.round(valA);
+       const roundedB = Math.round(valB);
+       const diff = Math.abs(roundedA - roundedB);
+       const penalty = Math.pow(Math.max(0, diff - 5), 3);
+       details.cliffPenalties[key] = { diff: diff, pen: penalty };
+       return penalty;
   };
 
-  const pw = 1.0; 
-  penaltyScore += calcCliff(normA.savunma, normB.savunma, 'savunma') * pw;  
-  penaltyScore += calcCliff(normA.pas, normB.pas, 'pas') * pw;   
-  penaltyScore += calcCliff(normA.sut, normB.sut, 'sut') * pw;
-  penaltyScore += calcCliff(normA.dribling, normB.dribling, 'dribling') * pw;
-  penaltyScore += calcCliff(normA.firsat, normB.firsat, 'firsat') * pw;
+  const penaltyWeight = 1.0; 
+  penaltyScore += calculateCliffPenalty(normA.savunma, normB.savunma, 'savunma') * penaltyWeight;  
+  penaltyScore += calculateCliffPenalty(normA.pas, normB.pas, 'pas') * penaltyWeight;   
+  penaltyScore += calculateCliffPenalty(normA.sut, normB.sut, 'sut') * penaltyWeight;
+  penaltyScore += calculateCliffPenalty(normA.dribling, normB.dribling, 'dribling') * penaltyWeight;
+  penaltyScore += calculateCliffPenalty(normA.firsat, normB.firsat, 'firsat') * penaltyWeight;
   
   if (!havaLowPriority) {
-      penaltyScore += calcCliff(normA.hava, normB.hava, 'hava') * pw;
+      penaltyScore += calculateCliffPenalty(normA.hava, normB.hava, 'hava') * penaltyWeight;
   }
 
-  details.totalCliffPenalty = Object.values(details.cliffPenalties).reduce((a, b) => a + b.pen, 0);
+  details.totalCliffPenalty = Object.values(details.cliffPenalties).reduce((acc, curr) => acc + curr.pen, 0);
 
-  // 3. TERS MEVKİ CEZASI
+  // 3. Ters Mevki Cezası
   details.invalidPenalty = (invalidCountA + invalidCountB) * 1000000;
   penaltyScore += details.invalidPenalty;
   
-  // 4. GRID (BÖLGE AÇIĞI) CEZASI
+  // 4. Bölge Açığı (Grid) Cezası
   penaltyScore += details.gridPenalty;
   details.totalPenalty = penaltyScore;
 
@@ -123,22 +128,22 @@ export function calculateBalanceMetrics(normA, normB, invalidCountA, invalidCoun
 }
 
 function getBasePosition(slot) {
-  const map = { "LCB": "CB", "RCB": "CB", "LCM": "CM", "RCM": "CM", "LDM": "DM", "RDM": "DM", "LAM": "AM", "RAM": "AM", "LFW": "FW", "RFW": "FW" };
-  return map[slot] || slot;
+  const positionMap = { "LCB": "CB", "RCB": "CB", "LCM": "CM", "RCM": "CM", "LDM": "DM", "RDM": "DM", "LAM": "AM", "RAM": "AM", "LFW": "FW", "RFW": "FW" };
+  return positionMap[slot] || slot;
 }
 
 function getCombinations(arr, k) {
     const results = [];
-    function helper(start, combo) {
-        if (combo.length === k) {
-            results.push([...combo]);
+    function helper(start, combination) {
+        if (combination.length === k) {
+            results.push([...combination]);
             return;
         }
         for (let i = start; i < arr.length; i++) {
-            if (arr.length - i < k - combo.length) break; 
-            combo.push(arr[i]);
-            helper(i + 1, combo);
-            combo.pop();
+            if (arr.length - i < k - combination.length) break; 
+            combination.push(arr[i]);
+            helper(i + 1, combination);
+            combination.pop();
         }
     }
     helper(0, []);
@@ -154,123 +159,119 @@ function isAttackerRole(basePos, role) {
     return false;
 }
 
-const processRolesAndCountAtk = (lineupObj) => {
-    let atkCount = 0;
+const processRolesAndCountAttackers = (lineupObj) => {
+    let attackerCount = 0;
     lineupObj.lineup.forEach(item => {
         if (item.invalid || !item.player) return;
-        let role = item.role;
-        if (!role || role === 'null' || item.outOfPos) {
-            role = getBestRoleForStats(item.basePos, item.player.stats);
-            item.role = role; 
+        let assignedRole = item.role;
+        if (!assignedRole || assignedRole === 'null' || item.outOfPos) {
+            assignedRole = getBestRoleForStats(item.basePos, item.player.stats);
+            item.role = assignedRole; 
         }
-        if (isAttackerRole(item.basePos, role)) atkCount++;
+        if (isAttackerRole(item.basePos, assignedRole)) attackerCount++;
     });
-    return atkCount;
+    return attackerCount;
 };
 
 export function getAllSquads(players, format, forceFill, havaLowPriority = true) {
-  const havaMulti = havaLowPriority ? 0.0001 : 1.0;
-  
-  const N = players.length;
-  if (N !== format * 2) return []; 
+  const playerCount = players.length;
+  if (playerCount !== format * 2) return []; 
 
-  players.forEach((p, i) => p._internal_id = i);
+  players.forEach((player, index) => player._internal_id = index);
   initFormationMatcher(players, forceFill);
 
   let totalPoolRawPotential = 0;
   let capableAttackersInPool = 0;
 
-  players.forEach(p => {
+  players.forEach(player => {
      let canAttack = false;
-     const mainBase = getBasePosition(p.mainPos);
-     const checkPos = (base, r) => {
-         const effRole = (!r || r === 'null') ? getBestRoleForStats(base, p.stats) : r;
-         return isAttackerRole(base, effRole);
+     const mainBase = getBasePosition(player.mainPos);
+     const checkPosition = (base, r) => {
+         const effectiveRole = (!r || r === 'null') ? getBestRoleForStats(base, player.stats) : r;
+         return isAttackerRole(base, effectiveRole);
      };
 
-     if (checkPos(mainBase, p.role)) canAttack = true;
-     if (p.secondaryPositions) {
-         p.secondaryPositions.forEach(sp => {
-             if (checkPos(getBasePosition(sp.pos), sp.role)) canAttack = true;
+     if (checkPosition(mainBase, player.role)) canAttack = true;
+     if (player.secondaryPositions) {
+         player.secondaryPositions.forEach(secondary => {
+             if (checkPosition(getBasePosition(secondary.pos), secondary.role)) canAttack = true;
          });
      }
      if (canAttack) capableAttackersInPool++;
 
      ['pas', 'savunma', 'sut', 'dribling', 'firsat', 'hava'].forEach(statName => {
-         let hamStat = p.stats[statName] || 0;
-         if(statName === 'sut' && !hamStat) hamStat = p.stats['şut'] || 0;
-         if(statName === 'firsat' && !hamStat) hamStat = p.stats['fırsat'] || 0;
-         totalPoolRawPotential += hamStat;
+         let rawStat = player.stats[statName] || 0;
+         if(statName === 'sut' && !rawStat) rawStat = player.stats['şut'] || 0;
+         if(statName === 'firsat' && !rawStat) rawStat = player.stats['fırsat'] || 0;
+         totalPoolRawPotential += rawStat;
      });
   });
 
-  const poolAvgStat = totalPoolRawPotential / (N * 6);
-  const targetScore = poolAvgStat * 0.70; 
+  const poolAverageStat = totalPoolRawPotential / (playerCount * 6);
+  const targetScore = poolAverageStat * 0.70; 
 
-  let targetAtkLimit = 0;
-  if (format > 5 && format < 10) targetAtkLimit = 3;
-  else if (format >= 10) targetAtkLimit = 4;
+  let targetAttackerLimit = 0;
+  if (format > 5 && format < 10) targetAttackerLimit = 3;
+  else if (format >= 10) targetAttackerLimit = 4;
 
-  const appliedAtkLimit = Math.min(targetAtkLimit, Math.floor(capableAttackersInPool / 2));
+  const appliedAttackerLimit = Math.min(targetAttackerLimit, Math.floor(capableAttackersInPool / 2));
+  const cache = new Array(1 << playerCount).fill(null);
 
-  const cache = new Array(1 << N).fill(null);
-
-  const getMemoLineup = (teamBits, teamArr) => {
-      if (cache[teamBits] !== null) return cache[teamBits];
-      const res = getPerfectLineups(teamArr, format, forceFill);
-      cache[teamBits] = res;
-      return res;
+  const getMemoizedLineup = (teamMask, teamArray) => {
+      if (cache[teamMask] !== null) return cache[teamMask];
+      const result = getPerfectLineups(teamArray, format, forceFill);
+      cache[teamMask] = result;
+      return result;
   };
 
   const targetSize = format;
-  const p0 = players[0];
-  
-  const restIndices = [];
-  for(let i=1; i<N; i++) restIndices.push(i);
+  const firstPlayer = players[0];
+  const remainingIndices = [];
+  for(let i = 1; i < playerCount; i++) remainingIndices.push(i);
 
-  const combos = getCombinations(restIndices, targetSize - 1);
+  const combinations = getCombinations(remainingIndices, targetSize - 1);
   let validResults = [];
 
-  for (const combo of combos) {
+  for (const combo of combinations) {
       const teamA = new Array(targetSize);
-      teamA[0] = p0;
-      let bitsA = (1 << 0);
+      teamA[0] = firstPlayer;
+      let teamAMask = (1 << 0);
       
-      const inTeamA = new Uint8Array(N); 
+      const inTeamA = new Uint8Array(playerCount); 
       inTeamA[0] = 1;
       
       for (let i = 0; i < combo.length; i++) {
           teamA[i+1] = players[combo[i]];
           inTeamA[combo[i]] = 1;
-          bitsA |= (1 << combo[i]);
+          teamAMask |= (1 << combo[i]);
       }
       
       const teamB = new Array(targetSize);
-      let bitsB = 0;
-      let bIdx = 0;
-      for (let i = 1; i < N; i++) {
+      let teamBMask = 0;
+      let indexB = 0;
+      for (let i = 1; i < playerCount; i++) {
           if (inTeamA[i] === 0) {
-              teamB[bIdx++] = players[i];
-              bitsB |= (1 << i);
+              teamB[indexB++] = players[i];
+              teamBMask |= (1 << i);
           }
       }
 
-      const lineupsA = getMemoLineup(bitsA, teamA);
-      const lineupsB = getMemoLineup(bitsB, teamB);
+      const lineupsA = getMemoizedLineup(teamAMask, teamA);
+      const lineupsB = getMemoizedLineup(teamBMask, teamB);
 
       if (!lineupsA || !lineupsB || !lineupsA.length || !lineupsB.length) continue;
 
       let validPair = null;
 
-      for (let la of lineupsA) {
-          if (!forceFill && la.invalidCount > 0) continue;
-          if (!forceFill && processRolesAndCountAtk(la) < appliedAtkLimit) continue;
+      for (let lineupA of lineupsA) {
+          if (!forceFill && lineupA.invalidCount > 0) continue;
+          if (!forceFill && processRolesAndCountAttackers(lineupA) < appliedAttackerLimit) continue;
           
-          for (let lb of lineupsB) {
-              if (!forceFill && lb.invalidCount > 0) continue;
-              if (!forceFill && processRolesAndCountAtk(lb) < appliedAtkLimit) continue;
+          for (let lineupB of lineupsB) {
+              if (!forceFill && lineupB.invalidCount > 0) continue;
+              if (!forceFill && processRolesAndCountAttackers(lineupB) < appliedAttackerLimit) continue;
               
-              validPair = { a: la, b: lb };
+              validPair = { a: lineupA, b: lineupB };
               break; 
           }
           if (validPair) break;
@@ -278,44 +279,42 @@ export function getAllSquads(players, format, forceFill, havaLowPriority = true)
 
       if (!validPair) continue; 
 
-      const bestA = validPair.a;
-      const bestB = validPair.b;
+      const bestLineupA = validPair.a;
+      const bestLineupB = validPair.b;
 
-      bestA.stats = calculateTeamStatsLineup(bestA.lineup);
-      bestB.stats = calculateTeamStatsLineup(bestB.lineup);
+      bestLineupA.stats = calculateTeamStatsLineup(bestLineupA.lineup);
+      bestLineupB.stats = calculateTeamStatsLineup(bestLineupB.lineup);
       
-      const normA = bestA.stats.normalized;
-      const normB = bestB.stats.normalized;
+      const normalizedA = bestLineupA.stats.normalized;
+      const normalizedB = bestLineupB.stats.normalized;
 
-      const statCount = havaLowPriority ? 5 : 6;
-      let sumNormA = normA.pas + normA.savunma + normA.sut + normA.dribling + normA.firsat;
-      let sumNormB = normB.pas + normB.savunma + normB.sut + normB.dribling + normB.firsat;
+      const activeStatCount = havaLowPriority ? 5 : 6;
+      let sumNormA = normalizedA.pas + normalizedA.savunma + normalizedA.sut + normalizedA.dribling + normalizedA.firsat;
+      let sumNormB = normalizedB.pas + normalizedB.savunma + normalizedB.sut + normalizedB.dribling + normalizedB.firsat;
       
       if (!havaLowPriority) {
-          sumNormA += normA.hava;
-          sumNormB += normA.hava;
+          sumNormA += normalizedA.hava;
+          sumNormB += normalizedA.hava;
       }
       
-      const ovrA = sumNormA / statCount;
-      const ovrB = sumNormB / statCount;
+      const overallA = sumNormA / activeStatCount;
+      const overallB = sumNormB / activeStatCount;
 
-      if (!forceFill && (ovrA < targetScore || ovrB < targetScore)) {
-          continue;
-      }
+      if (!forceFill && (overallA < targetScore || overallB < targetScore)) continue;
 
-      const metrics = calculateBalanceMetrics(normA, normB, bestA.invalidCount, bestB.invalidCount, ovrA, ovrB, bestA, bestB, havaLowPriority);
+      const metrics = calculateBalanceMetrics(normalizedA, normalizedB, bestLineupA.invalidCount, bestLineupB.invalidCount, overallA, overallB, bestLineupA, bestLineupB, havaLowPriority);
 
       if (metrics.penaltyScore > 500000 && !forceFill) continue;
 
       validResults.push({
           squad: { teamA, teamB, metrics },
-          lineupA: bestA,
-          lineupB: bestB,
+          lineupA: bestLineupA,
+          lineupB: bestLineupB,
           penalty: metrics.penaltyScore, 
           rawPenalty: metrics.penaltyScore,
           targetScore: targetScore, 
-          sumA: ovrA, 
-          sumB: ovrB,
+          sumA: overallA, 
+          sumB: overallB,
           metricsDetails: metrics.details
       });
   }
