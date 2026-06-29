@@ -296,7 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
     safeInputValueAssigner('pMainPos', "CB");
     safeInputValueAssigner('pCond', "Tam");
 
-    if (!document.getElementById('sim-pitch-fix')) {
+if (!document.getElementById('sim-pitch-fix')) {
         const simPitchFixStyles = document.createElement('style');
         simPitchFixStyles.id = 'sim-pitch-fix';
         simPitchFixStyles.innerHTML = `
@@ -304,11 +304,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 aspect-ratio: 1 / 1.15 !important; 
                 min-height: 550px !important; 
             }
-            /* SADECE MOBİL: Saha dikeyde büyütüldü, oyunculara bolca yer açıldı */
+            /* --- SADECE MOBİL: Taktik Sahasını Büyütme --- */
             @media (max-width: 900px) {
                 .pitch-inner {
-                    aspect-ratio: 1 / 1.35 !important; 
-                    min-height: 650px !important; 
+                    aspect-ratio: 1 / 1.5 !important; 
+                    min-height: 650px !important; /* Mobilde dikey uzunluk çok daha büyük */
                 }
             }
         `;
@@ -320,16 +320,21 @@ document.addEventListener('DOMContentLoaded', () => {
         statsGridStyles.id = 'stats-grid-fix-new';
         statsGridStyles.innerHTML = `
             .stat-box { display: flex; flex-direction: column; width: 100%; }
-            .spinner-wrapper { display: flex; width: 100%; height: 42px !important; } 
+            /* Ana özellik giriş kutuları büyütüldü (38px -> 44px) */
+            .spinner-wrapper { display: flex; width: 100%; height: 44px !important; } 
             .spinner-wrapper input { 
                 width: 100%; 
                 min-width: 0; 
                 box-sizing: border-box; 
-                padding: 10px 0 !important; 
-                font-size: 1.2em !important; 
+                padding: 0 !important; 
+                /* Sayılar biraz küçültüldü (1.1em -> 0.95em) */
+                font-size: 0.95em !important; 
                 height: 100% !important; 
+                text-align: center !important;
+                line-height: 44px !important; 
             }
-            .spin-btn { height: 100% !important; }
+            /* + ve - Butonları da dokunma kolaylığı için büyütüldü */
+            .spin-btn { height: 100% !important; width: 40px !important; font-size: 1.1em !important; }
         `;
         document.head.appendChild(statsGridStyles);
     }
@@ -375,16 +380,23 @@ document.addEventListener('DOMContentLoaded', () => {
             .spin-btn { width: 20px; font-size: 1em; line-height: 1; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.1); border:none; color: var(--text-main); cursor:pointer; padding:0; }
             .cap-input { font-size: 0.75em; padding: 0; text-align: center; flex: 1; border:none; background: var(--bg-input); color:var(--text-main); width: 100%; min-width:0; }
 
+            /* --- SADECE MOBİL: Harita Kutuları ve Kapasite Araçları --- */
             @media (max-width: 600px) {
-                #secPosMap { padding-bottom: 185%; } 
-                .pos-btn-group { min-width: 60px; width: 27%; padding: 2px; border-width: 1px; }
+                #secPosMap { padding-bottom: 200%; } 
+                
+                /* Haritadaki kutular genel olarak büyütüldü */
+                .pos-btn-group { min-width: 64px !important; width: 26%; padding: 3px; border-width: 1px; }
                 .pos-btn-group.main-pos { border-width: 2px; }
-                .node-name { font-size: 0.7em; }
-                .node-ovr { font-size: 0.65em; padding: 1px 3px; }
-                .role-select { font-size: 0.55em; height: 16px; }
-                .spinner-wrapper { height: 16px; }
-                .spin-btn { width: 16px; font-size: 0.9em; }
-                .cap-input { font-size: 0.7em; }
+                .node-name { font-size: 0.65em; }
+                .node-ovr { font-size: 0.6em; padding: 1px 2px; }
+                .sec-controls { gap: 3px; margin-top: 3px; }
+                
+                .role-select { font-size: 0.5em !important; height: 18px !important; padding: 0 !important; }
+                
+                /* Sayaç aracı (Spinner) yüksekliği artırıldı, içindeki fontlar küçültüldü */
+                .spinner-wrapper { height: 22px !important; } 
+                .spin-btn { width: 18px !important; font-size: 0.75em !important; } /* -, + işaretleri küçültüldü */
+                .cap-input { font-size: 0.65em !important; padding: 0 !important; line-height: 22px !important; } /* Sayılar (100) küçültüldü */
             }
         `;
         document.head.appendChild(pitchMapStyles);
@@ -1243,21 +1255,21 @@ function renderPositionMap() {
         <div class="pitch-center-circle"></div>
     `;
 
-    const generatedPitchCoords = {
-        "FW": { top: '8%', left: '50%' },
-        "LW": { top: '20%', left: '15%' },
-        "RW": { top: '20%', left: '85%' },
-        "AM": { top: '24%', left: '50%' },
-        "LM": { top: '38%', left: '15%' },
+const generatedPitchCoords = {
+        "FW": { top: '10%', left: '50%' },
+        "LW": { top: '26%', left: '15%' },
+        "RW": { top: '26%', left: '85%' },
+        "AM": { top: '26%', left: '50%' },
+        "LM": { top: '42%', left: '15%' },
         "CM": { top: '42%', left: '50%' },
-        "RM": { top: '38%', left: '85%' },
-        "LWB": { top: '56%', left: '15%' },
+        "RM": { top: '42%', left: '85%' },
+        "LWB": { top: '58%', left: '15%' },
         "DM": { top: '58%', left: '50%' },
-        "RWB": { top: '56%', left: '85%' },
-        "LB": { top: '76%', left: '15%' },
-        "CB": { top: '76%', left: '50%' },
-        "RB": { top: '76%', left: '85%' },
-        "GK": { top: '92%', left: '50%' }
+        "RWB": { top: '58%', left: '85%' },
+        "LB": { top: '74%', left: '15%' },
+        "CB": { top: '74%', left: '50%' },
+        "RB": { top: '74%', left: '85%' },
+        "GK": { top: '90%', left: '50%' }
     };
 
     ALL_POSITIONS.forEach(generatedPosItem => {
@@ -1407,7 +1419,6 @@ function updatePlayerList() {
     if (!listElementNodeContainer) return;
     chartInstances = {};
     
-    // Görsel düzenlemeler için gerekli CSS sınıfları (Fonksiyon çalıştığında otomatik eklenir)
     if (!document.getElementById('custom-layout-fixes')) {
         const styleFix = document.createElement('style');
         styleFix.id = 'custom-layout-fixes';
@@ -1420,20 +1431,67 @@ function updatePlayerList() {
             .unselected-player-text * {
                 text-decoration: line-through !important;
             }
-            .visuals-container {
+            
+            /* --- MASAÜSTÜ (DEFAULT) GÖRÜNÜM --- */
+            .player-details-row {
                 display: flex;
-                flex-direction: row;
-                justify-content: space-around;
-                align-items: center;
-                margin-top: 15px;
                 gap: 15px;
+                flex-wrap: wrap;
+                align-items: flex-start;
             }
-            .visuals-container > div {
-                flex: 1;
-                max-width: 48%;
-            }
+            .pd-col-stats { flex: 1.5; min-width: 250px; }
+            .pd-col-pitch { flex: 1; min-width: 140px; }
+            .pd-col-sec { flex: 1; min-width: 140px; }
+            
+            /* MASAÜSTÜNDE GRAFİK BOYUTU BÜYÜTÜLDÜ (220px -> 280px) */
+            .mobile-chart-wrap { position: relative; width: 100%; max-width: 280px; aspect-ratio: 1/1; margin: 10px auto 0 auto; display: flex; justify-content: center; }
+            .mini-pitch-wrapper { width: 100%; max-width: 160px; margin: 0 auto; }
+            .pitch-bg { background: var(--pitch-bg); border-radius: 4px; padding: 2px; }
+            
+            .mobile-actions-wrap { flex-basis: 100%; display: flex; gap: 15px; margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 15px; }
+            .btn-edit, .btn-delete { min-width: 120px; }
+
+            /* --- SADECE MOBİL GÖRÜNÜM --- */
             @media (max-width: 600px) {
-                .visuals-container { gap: 8px; }
+                .player-details-row {
+                    display: grid !important;
+                    grid-template-columns: 1fr 1fr;
+                    grid-template-areas: 
+                        "table table"
+                        "chart pitch"
+                        "sec sec"
+                        "actions actions";
+                    gap: 10px;
+                    align-items: center;
+                }
+                .pd-col-stats { display: contents; }
+                
+                .mobile-table-wrap { grid-area: table; width: 100%; }
+                
+                .mobile-chart-wrap {
+                    grid-area: chart;
+                    width: 100%;
+                    max-width: 100%; 
+                    min-width: 0;
+                    margin: 0;
+                }
+                .pd-col-pitch {
+                    grid-area: pitch;
+                    width: 100%;
+                    max-width: 100%;
+                    min-width: 0;
+                    margin: 0;
+                    display: flex;
+                    justify-content: center;
+                }
+                .mini-pitch-wrapper { width: 100%; max-width: 100%; }
+                
+                .pd-col-sec { grid-area: sec; margin-top: 5px; }
+                .mobile-actions-wrap { grid-area: actions; margin-top: 0; display: flex; }
+                .btn-edit, .btn-delete { min-width: 0; flex: 1; }
+                
+                .pitch-label { font-size: 0.75em !important; }
+                .pitch-sublabel { font-size: 0.7em !important; }
             }
         `;
         document.head.appendChild(styleFix);
@@ -1487,7 +1545,7 @@ function updatePlayerList() {
                 const dribValueParam = renderingPlayerInstance.stats.dribling||0; const firsatValueParam = renderingPlayerInstance.stats.firsat ?? (renderingPlayerInstance.stats.fırsat||0);
 
                 const tabularStatsHtmlOutput = `
-                  <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.95em; width: 100%;">
+                  <div class="mobile-table-wrap" style="display: flex; flex-direction: column; gap: 8px; font-size: 0.95em; width: 100%;">
                     <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>Hava Topu:</b> <span style="font-weight:bold; color:${getStatColor(havaValueParam)};">${havaValueParam}</span></div>
                     <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>Pas D.:</b> <span style="font-weight:bold; color:${getStatColor(pasValueParam)};">${pasValueParam}</span></div>
                     <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;"><b>Savunma:</b> <span style="font-weight:bold; color:${getStatColor(savValueParam)};">${savValueParam}</span></div>
@@ -1526,21 +1584,21 @@ function updatePlayerList() {
                   <div class="player-details-row">
                     <div class="pd-col-stats">
                         ${tabularStatsHtmlOutput}
-                    </div>
-                    
-                    <div class="visuals-container">
-                        <div style="position:relative; aspect-ratio: 1/1;">
+                        <div class="mobile-chart-wrap">
                             <canvas id="chart-${renderingPlayerInstance.id}"></canvas>
                         </div>
-                        <div>
-                            <span style="font-size:0.85em; font-weight:bold; color:var(--text-muted); text-align:center; display:block; margin-bottom:5px;">📍 Mevki Haritası<br><span style="font-size:0.8em; color:#e74c3c;">(Tıklayarak yasakla)</span></span>
-                            <div style="background: var(--pitch-bg); border-radius: 4px; padding: 2px;">
+                    </div>
+                    
+                    <div class="pd-col-pitch">
+                        <div class="mini-pitch-wrapper">
+                            <span class="pitch-label" style="font-size:0.85em; font-weight:bold; color:var(--text-muted); text-align:center; display:block; margin-bottom:5px;">📍 Mevki Haritası<br><span class="pitch-sublabel" style="font-size:0.8em; color:#e74c3c;">(Tıklayarak yasakla)</span></span>
+                            <div class="pitch-bg">
                                 ${generateMiniPitchHTML(renderingPlayerInstance, "100%")}
                             </div>
                         </div>
                     </div>
                     
-                    <div class="pd-col-sec" style="margin-top: 15px;">
+                    <div class="pd-col-sec">
                         <div>
                             <span style="font-size:0.9em; font-weight:bold; display:block; margin-bottom:8px;">Yan Mevkiler:</span>
                             <div class="sec-pos-badges">
@@ -1549,10 +1607,11 @@ function updatePlayerList() {
                         </div>
                     </div>
                     
-                    <div style="flex-basis: 100%; display: flex; gap: 15px; margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 15px; justify-content: flex-start;">
-                        <button type="button" class="btn btn-yellow btn-edit" data-id="${renderingPlayerInstance.id}" style="min-width: 120px;">Düzenle</button>
-                        <button type="button" class="btn btn-red btn-delete" data-id="${renderingPlayerInstance.id}" style="min-width: 120px;">Sil</button>
+                    <div class="mobile-actions-wrap">
+                        <button type="button" class="btn btn-yellow btn-edit" data-id="${renderingPlayerInstance.id}">Düzenle</button>
+                        <button type="button" class="btn btn-red btn-delete" data-id="${renderingPlayerInstance.id}">Sil</button>
                     </div>
+                    
                   </div>
                 </details>`;
             }).join('');
@@ -1682,19 +1741,40 @@ function renderSimCard(processingCardIndex) {
     
     const contextCanvasReference = document.getElementById(`teamChart-${processingCardIndex}`);
     if(contextCanvasReference) {
+        // Simülasyon Kartı için de Kısaltma ve Sıralama
+        const isMobileView = window.innerWidth <= 600;
+        const lblHava = 'Hava';
+        const lblSav = isMobileView ? 'Sav' : 'Savunma';
+        const lblPas = 'Pas D.';
+        const lblFirsat = 'Fırsat Y.';
+        const lblDrib = isMobileView ? 'Drib' : 'Dribling';
+        const lblSut = 'Şut';
+
         simCharts[processingCardIndex] = new Chart(contextCanvasReference.getContext('2d'), { 
             type: 'radar', 
             data: { 
-                labels: ['Hava', 'Pas D.', 'Sav', 'Şut', 'Dribling', 'Fırsat Y.'], 
+                labels: [lblHava, lblSav, lblPas, lblFirsat, lblDrib, lblSut], 
                 datasets: [
-                    { label: 'A Takımı', data: [Math.round(evaluationNormalizedStatsA.hava), Math.round(evaluationNormalizedStatsA.pas), Math.round(evaluationNormalizedStatsA.savunma), Math.round(evaluationNormalizedStatsA.sut), Math.round(evaluationNormalizedStatsA.dribling), Math.round(evaluationNormalizedStatsA.firsat)], backgroundColor: 'rgba(52, 152, 219, 0.25)', borderColor: '#3498db', borderWidth: 2, pointBackgroundColor: '#3498db', pointRadius: 2 }, 
-                    { label: 'B Takımı', data: [Math.round(evaluationNormalizedStatsB.hava), Math.round(evaluationNormalizedStatsB.pas), Math.round(evaluationNormalizedStatsB.savunma), Math.round(evaluationNormalizedStatsB.sut), Math.round(evaluationNormalizedStatsB.dribling), Math.round(evaluationNormalizedStatsB.firsat)], backgroundColor: 'rgba(231, 76, 60, 0.25)', borderColor: '#e74c3c', borderWidth: 2, pointBackgroundColor: '#e74c3c', pointRadius: 2 }
+                    { label: 'A Takımı', data: [Math.round(evaluationNormalizedStatsA.hava), Math.round(evaluationNormalizedStatsA.savunma), Math.round(evaluationNormalizedStatsA.pas), Math.round(evaluationNormalizedStatsA.firsat), Math.round(evaluationNormalizedStatsA.dribling), Math.round(evaluationNormalizedStatsA.sut)], backgroundColor: 'rgba(52, 152, 219, 0.25)', borderColor: '#3498db', borderWidth: 2, pointBackgroundColor: '#3498db', pointRadius: 2 }, 
+                    { label: 'B Takımı', data: [Math.round(evaluationNormalizedStatsB.hava), Math.round(evaluationNormalizedStatsB.savunma), Math.round(evaluationNormalizedStatsB.pas), Math.round(evaluationNormalizedStatsB.firsat), Math.round(evaluationNormalizedStatsB.dribling), Math.round(evaluationNormalizedStatsB.sut)], backgroundColor: 'rgba(231, 76, 60, 0.25)', borderColor: '#e74c3c', borderWidth: 2, pointBackgroundColor: '#e74c3c', pointRadius: 2 }
                 ] 
             }, 
             options: { 
-                layout: { padding: 25 }, 
+                layout: { padding: isMobileView ? 5 : 25 }, 
                 maintainAspectRatio: false, 
-                scales: { r: { min: 0, max: 100, ticks: { display: false }, grid: { color: 'rgba(127, 140, 141, 0.2)' }, angleLines: { color: 'rgba(127, 140, 141, 0.2)' }, pointLabels: { color: '#7f8c8d', font: { size: 12, weight: 'bold' } } } }, 
+                scales: { 
+                    r: { 
+                        min: 0, max: 100, 
+                        ticks: { display: false }, 
+                        grid: { color: 'rgba(127, 140, 141, 0.2)' }, 
+                        angleLines: { color: 'rgba(127, 140, 141, 0.2)' }, 
+                        pointLabels: { 
+                            color: '#7f8c8d', 
+                            font: { size: isMobileView ? 10 : 12, weight: 'bold' },
+                            padding: isMobileView ? 4 : 8 
+                        } 
+                    } 
+                }, 
                 plugins: { legend: { display: false } } 
             } 
         });
@@ -1796,14 +1876,31 @@ function renderRadarChart(assignedPlayerId) {
     const normalizedSutKarsilamaEval = playerContextDef.stats.sutKarsilama || 0;
     const normalizedFirsatEval = playerContextDef.stats.firsat !== undefined ? playerContextDef.stats.firsat : (playerContextDef.stats.fırsat || 0);
     
-    const graphChartLabelsInfo = booleanIsActiveGoalKeeper ? ['Pas D.', 'Savunma', 'Şut K.', 'Dribling', 'Fırsat Y.', 'Hava'] : ['Pas D.', 'Savunma', 'Şut', 'Dribling', 'Fırsat Y.', 'Hava'];
-    const graphChartDatapointsInfo = booleanIsActiveGoalKeeper ? [playerContextDef.stats.pas, playerContextDef.stats.savunma, normalizedSutKarsilamaEval, playerContextDef.stats.dribling, normalizedFirsatEval, playerContextDef.stats.hava] : [playerContextDef.stats.pas, playerContextDef.stats.savunma, normalizedSutEval, playerContextDef.stats.dribling, normalizedFirsatEval, playerContextDef.stats.hava];
+    // Mobilde kısaltmaları etkinleştir, grafiğe daha fazla alan aç
+    const isMobileView = window.innerWidth <= 600;
+    const lblHava = 'Hava';
+    const lblSav = isMobileView ? 'Sav' : 'Savunma';
+    const lblPas = 'Pas D.';
+    const lblFirsat = 'Fırsat Y.';
+    const lblDrib = isMobileView ? 'Drib' : 'Dribling';
+    const lblSut = booleanIsActiveGoalKeeper ? 'Şut K.' : 'Şut';
+
+    // Sıralama (Saat yönünde): Hava(0), Sav(1), Pas(2), Fırsat(3), Dribling(4), Şut(5)
+    const graphChartLabelsInfo = [lblHava, lblSav, lblPas, lblFirsat, lblDrib, lblSut];
+    const graphChartDatapointsInfo = [
+        playerContextDef.stats.hava || 0,
+        playerContextDef.stats.savunma || 0,
+        playerContextDef.stats.pas || 0,
+        normalizedFirsatEval,
+        playerContextDef.stats.dribling || 0,
+        booleanIsActiveGoalKeeper ? normalizedSutKarsilamaEval : normalizedSutEval
+    ];
     
     chartInstances[assignedPlayerId] = new Chart(requiredCanvasReferenceNode.getContext('2d'), { 
         type: 'radar', 
         data: { labels: graphChartLabelsInfo, datasets: [{ label: 'Profil Performansı', data: graphChartDatapointsInfo, backgroundColor: 'rgba(0, 210, 211, 0.25)', borderColor: '#00d2d3', pointBackgroundColor: '#1dd1a1', borderWidth: 2 }] }, 
         options: { 
-            layout: { padding: 25 }, 
+            layout: { padding: isMobileView ? 5 : 15 }, // Mobilde padding düşürüldü, grafik büyüdü
             maintainAspectRatio: false, 
             scales: { 
                 r: { 
@@ -1811,7 +1908,11 @@ function renderRadarChart(assignedPlayerId) {
                     ticks: { display: false, stepSize: 20 }, 
                     grid: { color: 'rgba(127, 140, 141, 0.2)' }, 
                     angleLines: { color: 'rgba(127, 140, 141, 0.2)' }, 
-                    pointLabels: { color: '#7f8c8d', font: { size: 12, weight: 'bold' }, padding: 10 } 
+                    pointLabels: { 
+                        color: '#7f8c8d', 
+                        font: { size: isMobileView ? 10 : 12, weight: 'bold' }, // Mobilde ufaltılıp sığdırıldı
+                        padding: isMobileView ? 4 : 8 
+                    } 
                 } 
             }, 
             plugins: { legend: { display: false } } 
