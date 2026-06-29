@@ -197,11 +197,11 @@ export const ROLE_WEIGHTS = {
     },
     "Top Kapan Orta Saha": {
       "pas": 15,
-      "savunma": 50,
+      "savunma": 60,
       "hava": 5,
-      "dribling": 20,
+      "dribling": 15,
       "sut": 5,
-      "firsat": 5
+      "firsat": 0
     },
     "Standart Orta Saha": {
       "pas": 30,
