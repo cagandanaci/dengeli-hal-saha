@@ -72,47 +72,54 @@ export function calculateTeamStatsLineup(lineupArr) {
 }
 
 export function calculateBalanceMetrics(normA, normB, invalidCountA, invalidCountB, ovrA, ovrB, lineupA, lineupB, havaLowPriority) {
-  let penaltyScore = 0;
-  
-  // 1. SAF DENGE: Toplam OVR Farkı (Ana Etken)
-  const netDiff = Math.abs(ovrA - ovrB);
-  penaltyScore += netDiff * 1000.0;
+  let details = {
+      netDiffFormula: "",
+      netDiffPenalty: 0,
+      cliffPenalties: { pas: {diff: 0, pen: 0}, savunma: {diff: 0, pen: 0}, sut: {diff: 0, pen: 0}, dribling: {diff: 0, pen: 0}, firsat: {diff: 0, pen: 0}, hava: {diff: 0, pen: 0} },
+      totalCliffPenalty: 0,
+      invalidPenalty: 0,
+      gridPenalty: (lineupA.gridPenalty || 0) + (lineupB.gridPenalty || 0),
+      totalPenalty: 0
+  };
 
-  // 2. UÇURUM CEZASI: max(0, |Fark| - 5)^3
-  const calcCliff = (valA, valB) => {
-       let diff = Math.abs(valA - valB);
-       return Math.pow(Math.max(0, diff - 5), 3);
+  // 1. SAF DENGE (Net OVR x 1000)
+  const netDiff = Math.abs(ovrA - ovrB);
+  details.netDiffPenalty = netDiff * 1000.0;
+  details.netDiffFormula = `|${ovrA.toFixed(2)} - ${ovrB.toFixed(2)}| = ${netDiff.toFixed(2)} * 1000`;
+  let penaltyScore = details.netDiffPenalty;
+
+  // 2. KRİTİK ÖZELLİK FARKI CEZASI
+  const calcCliff = (valA, valB, key) => {
+       let rA = Math.round(valA);
+       let rB = Math.round(valB);
+       let diff = Math.abs(rA - rB);
+       let pen = Math.pow(Math.max(0, diff - 5), 3);
+       details.cliffPenalties[key] = { diff: diff, pen: pen };
+       return pen;
   };
 
   const pw = 1.0; 
-  penaltyScore += calcCliff(normA.savunma, normB.savunma) * pw;  
-  penaltyScore += calcCliff(normA.pas, normB.pas) * pw;   
-  penaltyScore += calcCliff(normA.sut, normB.sut) * pw;
-  penaltyScore += calcCliff(normA.dribling, normB.dribling) * pw;
-  penaltyScore += calcCliff(normA.firsat, normB.firsat) * pw;
+  penaltyScore += calcCliff(normA.savunma, normB.savunma, 'savunma') * pw;  
+  penaltyScore += calcCliff(normA.pas, normB.pas, 'pas') * pw;   
+  penaltyScore += calcCliff(normA.sut, normB.sut, 'sut') * pw;
+  penaltyScore += calcCliff(normA.dribling, normB.dribling, 'dribling') * pw;
+  penaltyScore += calcCliff(normA.firsat, normB.firsat, 'firsat') * pw;
   
   if (!havaLowPriority) {
-      penaltyScore += calcCliff(normA.hava, normB.hava) * pw;
+      penaltyScore += calcCliff(normA.hava, normB.hava, 'hava') * pw;
   }
 
-  // 3. TERS MEVKİ (Invalid) CEZASI
-  penaltyScore += (invalidCountA + invalidCountB) * 1000000;
+  details.totalCliffPenalty = Object.values(details.cliffPenalties).reduce((a, b) => a + b.pen, 0);
 
-  // 🔥 4. BİREYSEL POTANSİYEL İSRAFI (Wasted Potential) TIE-BREAKER'I 🔥
-  const calcWastedPotential = (lineupObj) => {
-      let waste = 0;
-      lineupObj.lineup.forEach(item => {
-          if (!item.player || item.invalid || item.cap === 100) return;
-          const p = item.player;
-          const rawSum = (p.stats.pas || 0) + (p.stats.savunma || 0) + (p.stats.sut || p.stats.şut || 0) + (p.stats.dribling || 0) + (p.stats.firsat || p.stats.fırsat || 0);
-          const drop = (100 - item.cap) / 100; 
-          waste += (rawSum * drop);
-      });
-      return waste;
-  };
-  penaltyScore += (calcWastedPotential(lineupA) + calcWastedPotential(lineupB)) * 2.0;
+  // 3. TERS MEVKİ CEZASI
+  details.invalidPenalty = (invalidCountA + invalidCountB) * 1000000;
+  penaltyScore += details.invalidPenalty;
+  
+  // 4. GRID (BÖLGE AÇIĞI) CEZASI
+  penaltyScore += details.gridPenalty;
+  details.totalPenalty = penaltyScore;
 
-  return { penaltyScore };
+  return { penaltyScore, details };
 }
 
 function getBasePosition(slot) {
@@ -308,7 +315,8 @@ export function getAllSquads(players, format, forceFill, havaLowPriority = true)
           rawPenalty: metrics.penaltyScore,
           targetScore: targetScore, 
           sumA: ovrA, 
-          sumB: ovrB
+          sumB: ovrB,
+          metricsDetails: metrics.details
       });
   }
 

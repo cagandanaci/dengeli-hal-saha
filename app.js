@@ -300,6 +300,37 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         document.head.appendChild(ds);
     }
+    if (!document.getElementById('mobile-fix-styles')) {
+        const ms = document.createElement('style');
+        ms.id = 'mobile-fix-styles';
+        ms.innerHTML = `
+            .settings-panel, .settings-panel > div {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            .settings-panel label, .settings-panel button {
+                flex: 1 1 auto;
+                min-width: 120px;
+                box-sizing: border-box;
+                white-space: nowrap;
+                margin: 0 !important;
+            }
+            .db-management-container > div {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                width: 100%;
+            }
+            .db-management-container select, .db-management-container button {
+                flex: 1 1 calc(33% - 8px);
+                min-width: 90px;
+                box-sizing: border-box;
+                margin: 0 !important;
+            }
+        `;
+        document.head.appendChild(ms);
+    }
 
     const livePitchWrap = document.getElementById('livePitchWrap');
     if (livePitchWrap) livePitchWrap.style.display = 'none'; 
@@ -1006,7 +1037,7 @@ function updatePlayerList() {
     chartInstances = {};
     
     const openStates = {};
-    document.querySelectorAll('details.player-item').forEach(det => { if (det.open) openStates[det.id] = true; });
+    document.querySelectorAll('details.player-item, details.category-item').forEach(det => { if (det.open) openStates[det.id] = true; });
 
     const format = Number(document.getElementById('matchFormat')?.value || 7);
     const req = format * 2; const sel = currentPlayers.filter(p => p.selected).length;
@@ -1014,12 +1045,26 @@ function updatePlayerList() {
     if (statusEl) { statusEl.innerText = `Seçilen: ${sel} / ${req}`; statusEl.style.color = sel === req ? "#a8e63d" : "#e74c3c"; }
 
     let html = "";
-    const categories = [ { t: "🧤 KALECİLER", p: ["GK"] }, { t: "🛡️ SAVUNMALAR", p: ["CB", "LB", "RB", "LWB", "RWB"] }, { t: "⚙️ ORTA SAHALAR", p: ["DM", "CM", "AM", "LM", "RM"] }, { t: "⚔️ HÜCUMCULAR", p: ["LW", "RW", "FW"] } ];
+    const categories = [ 
+        { id: "cat-gk", t: "🧤 KALECİLER", p: ["GK"] }, 
+        { id: "cat-def", t: "🛡️ SAVUNMALAR", p: ["CB", "LB", "RB", "LWB", "RWB"] }, 
+        { id: "cat-mid", t: "⚙️ ORTA SAHALAR", p: ["DM", "CM", "AM", "LM", "RM"] }, 
+        { id: "cat-atk", t: "⚔️ HÜCUMCULAR", p: ["LW", "RW", "FW"] } 
+    ];
 
     categories.forEach(cat => {
         const pList = currentPlayers.filter(p => cat.p.includes(getBasePosition(p.mainPos)));
         if (pList.length > 0) {
-            html += `<div style="background: #1a6b2e; color: white; padding: 5px 10px; margin-top: 15px; margin-bottom: 5px; border-radius: 4px; font-weight: bold;">${cat.t} (${pList.length})</div>`;
+            const isOpen = openStates[cat.id] !== false; 
+            
+            // UI Taşma Çözümü: margin ve box-sizing eklendi
+            html += `<details class="category-item" id="${cat.id}" ${isOpen ? 'open' : ''} style="margin: 10px 5px 5px 5px; border-radius: 4px; overflow: hidden; border: 1px solid #1a6b2e; box-sizing: border-box;">
+                        <summary style="background: #1a6b2e; color: white; padding: 8px 12px; cursor: pointer; font-weight: bold; list-style: none; display: flex; justify-content: space-between; align-items: center; user-select: none;">
+                            <span>${cat.t} (${pList.length})</span>
+                            <span style="font-size: 0.8em; opacity: 0.8;">▼</span>
+                        </summary>
+                        <div style="padding: 5px;">`;
+            
             html += pList.map(p => {
                 const nameColor = p.isTest ? '#2ecc71' : 'inherit'; 
                 const displayNameHtml = p.shortName?.trim() ? ` <span style="color:var(--text-muted); font-size:0.85em;">(${p.shortName.trim()})</span>` : '';
@@ -1056,7 +1101,7 @@ function updatePlayerList() {
                 }
 
                 return `
-                <details class="player-item" id="details-${p.id}">
+                <details class="player-item" id="details-${p.id}" style="margin-bottom: 8px;">
                   <summary class="player-summary">
                     <div style="display: flex; align-items: center; gap: 10px;">
                       <input type="checkbox" class="player-select-cb" data-id="${p.id}" ${p.selected ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer;">
@@ -1094,6 +1139,8 @@ function updatePlayerList() {
                   </div>
                 </details>`;
             }).join('');
+            
+            html += `</div></details>`;
         }
     });
     listEl.innerHTML = html;
@@ -1344,6 +1391,45 @@ function renderSimCard(index) {
 
     const resetBtnHtml = isModified ? `<button class="btn-reset-sim" data-card="${index}" style="margin-left:auto; background:#e74c3c; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-size:0.85em; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3); transition: all 0.2s;">🔄 Sıfırla</button>` : '';
 
+    let logHtml = `<div style="color:var(--text-muted); font-size:0.9em; padding:10px;">Değiştirilmiş kadrolar için log hesaplanamaz. Sıfırlayınız.</div>`;
+    if (!isModified && dataObj.original.metricsDetails) {
+        const details = dataObj.original.metricsDetails;
+        
+        const formatCliff = (name, obj) => {
+            if(obj.diff === 0 && obj.pen === 0) return `<span style="color:#7f8c8d;">${name}: 0</span>`;
+            let mathStr = obj.diff > 5 ? `(${obj.diff}-5)³` : `(${obj.diff} ≤ 5)`;
+            let color = obj.diff > 5 ? '#e74c3c' : '#2ecc71';
+            return `<span>${name}: |Fark ${obj.diff}| ➔ ${mathStr} = <b style="color:${color};">${obj.pen}</b></span>`;
+        };
+
+        const isHavaLow = document.getElementById('cbLowHava')?.checked;
+
+        logHtml = `
+            <div class="sim-log-content" style="font-family: monospace; font-size: 0.9em; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 4px; line-height: 1.6;">
+                <div style="color: #bdc3c7; margin-bottom: 8px;"><b>[🎯] Hedef Kalite (Baseline):</b> ${dataObj.original.targetScore.toFixed(1)} OVR <span style="font-size:0.85em;">(A: ${dataObj.original.sumA.toFixed(2)} | B: ${dataObj.original.sumB.toFixed(2)})</span></div>
+                
+                <div style="color: #3498db; margin-bottom: 4px;"><b>[1] Saf Denge:</b> <span style="color:#ecf0f1;">${details.netDiffFormula}</span> = <b>${details.netDiffPenalty.toFixed(1)} Ceza</b></div>
+                
+                <div style="color: #e74c3c; margin-bottom: 4px;"><b>[2] Kritik Özellik Farkı Cezası:</b> <b>${details.totalCliffPenalty} Ceza</b></div>
+                <div style="padding-left: 15px; color: #95a5a6; font-size: 0.85em; margin-bottom: 8px; line-height: 1.5;">
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px;">
+                        <div>${formatCliff('Pas D.', details.cliffPenalties.pas)}</div>
+                        <div>${formatCliff('Savunma', details.cliffPenalties.savunma)}</div>
+                        <div>${formatCliff('Şut', details.cliffPenalties.sut)}</div>
+                        <div>${formatCliff('Dribling', details.cliffPenalties.dribling)}</div>
+                        <div>${formatCliff('Fırsat Y.', details.cliffPenalties.firsat)}</div>
+                        ${!isHavaLow ? `<div>${formatCliff('Hava T.', details.cliffPenalties.hava)}</div>` : ''}
+                    </div>
+                </div>
+                
+                <div style="color: #f1c40f; margin-bottom: 4px;"><b>[3] Formasyon Grid Cezası (Açıklar):</b> <b>${details.gridPenalty.toFixed(1)} Ceza</b></div>
+                
+                <hr style="border: 0; border-top: 1px dashed rgba(255,255,255,0.2); margin: 8px 0;">
+                <div style="color: #ecf0f1; font-weight: bold; font-size: 1.1em;">NET SKOR (Düşük Daha İyi): ${details.totalPenalty.toFixed(0)}</div>
+            </div>
+        `;
+    }
+
     let html = `
     <div class="sim-result-card" style="border: ${isModified ? '2px solid #f39c12' : '1px solid var(--border-color)'}; transition: all 0.3s ease;">
         <div style="color: #f39c12; font-weight: bold; font-size: 1.1em; margin-bottom: 15px; display:flex; align-items:center;">
@@ -1384,18 +1470,14 @@ function renderSimCard(index) {
             </div>
         </div>
 
-        <details class="sim-log-details">
-            <summary style="font-weight: bold; color: #3498db; outline: none; list-style: none; cursor:pointer;">
+        <details class="sim-log-details" style="margin-top: 15px; border: 1px solid var(--border-color); border-radius: 4px;">
+            <summary style="font-weight: bold; color: #3498db; outline: none; list-style: none; cursor:pointer; padding: 10px; background: rgba(52, 152, 219, 0.1);">
                 <span style="display: flex; align-items: center; gap: 5px;">
                     <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>
-                    Algoritma Karar Dökümünü Göster
+                    Algoritma Karar Dökümü & Ceza Raporu
                 </span>
             </summary>
-            <div class="sim-log-content">
-                <div style="margin-bottom: 5px;"><b>[🎯] Havuz Kalitesi OVR Barajı:</b> ${data.targetScore.toFixed(1)} OVR <span style="color:var(--text-muted); font-size: 0.9em;">(A: ${data.sumA.toFixed(1)} | B: ${data.sumB.toFixed(1)})</span></div>
-                <div style="margin-bottom: 5px;"><b>[⚖️] Takımlar Arası Net Güç Farkı:</b> <span style="color:${Math.abs(data.sumA - data.sumB) < 5 ? '#2ecc71' : '#e74c3c'};">${(Math.abs(data.sumA - data.sumB)).toFixed(1)}</span> Net Puan</div>
-                <div style="font-size:0.85em; color:var(--text-muted); margin-top:10px;">* Takımlar dizilişin hakkını verme (0-100) yüzdesine göre adil kıyaslanmıştır. Göbek boşluğu ve yetenek israfı dengeye etki eder.</div>
-            </div>
+            ${logHtml}
         </details>
     </div>`;
 

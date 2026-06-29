@@ -10,9 +10,9 @@ export const CONDITIONS = {
 export const ROLE_WEIGHTS = {
   "GK": {
     "Kaleci": {
-      "sutKarsilama": 75,
+      "sutKarsilama": 80,
       "pas": 5,
-      "savunma": 10,
+      "savunma": 5,
       "hava": 10,
       "dribling": 0,
       "firsat": 0
