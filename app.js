@@ -68,7 +68,6 @@ function resetRoleWeights() {
 let currentPlayers = [];
 let editingPlayerId = null;
 let chartInstances = {};
-
 let simResults = []; 
 let simCharts = {};  
 
@@ -262,18 +261,15 @@ document.addEventListener('dragleave', (e) => {
 
 document.addEventListener('drop', (e) => {
     document.body.classList.remove('is-dragging');
-
     const targetEl = e.target.closest('.pitch-player, .pitch-empty-slot');
     if (targetEl && targetEl.dataset.card) {
         e.preventDefault();
-        
         document.querySelectorAll('.pitch-empty-slot').forEach(el => {
             el.style.opacity = '0';
             el.style.pointerEvents = 'none';
             el.style.borderColor = 'rgba(255,255,255,0.4)';
             el.style.background = 'rgba(0,0,0,0.2)';
         });
-        
         const rawData = e.dataTransfer.getData('text/plain');
         if (!rawData) return;
         try {
@@ -291,6 +287,76 @@ document.addEventListener('drop', (e) => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
+    const safeSetVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+    ['sPas', 'sSavunma', 'sSut', 'sDribling', 'sFirsat', 'sHava'].forEach(id => safeSetVal(id, 40));
+    safeSetVal('sSutKar', 0);
+    safeSetVal('pName', "");
+    safeSetVal('pLastName', "");
+    safeSetVal('pShortName', "");
+    safeSetVal('pMainPos', "CB");
+    safeSetVal('pCond', "Tam");
+
+    if (!document.getElementById('stats-grid-fix-new')) {
+        const sgf = document.createElement('style');
+        sgf.id = 'stats-grid-fix-new';
+        sgf.innerHTML = `
+            .stat-box { display: flex; flex-direction: column; width: 100%; }
+            .spinner-wrapper { display: flex; width: 100%; height: 42px !important; } /* Kutu yüksekliği artırıldı */
+            .spinner-wrapper input { 
+                width: 100%; 
+                min-width: 0; 
+                box-sizing: border-box; 
+                padding: 10px 0 !important; /* Sayıların üstüne ve altına geniş boşluk eklendi */
+                font-size: 1.2em !important; /* Sayılar daha net okunması için büyütüldü */
+                height: 100% !important; 
+            }
+            .spin-btn { height: 100% !important; }
+        `;
+        document.head.appendChild(sgf);
+    }
+
+    if (!document.getElementById('pitch-map-styles')) {
+        const pms = document.createElement('style');
+        pms.id = 'pitch-map-styles';
+        pms.innerHTML = `
+            #secPosMap {
+                display: block !important;
+                position: relative;
+                width: 100%;
+                background: var(--pitch-bg);
+                border: 2px solid rgba(255,255,255,0.4);
+                border-radius: 8px;
+                padding-bottom: 165%; /* Haritayı dikeyde daha da uzattık */
+                margin-top: 15px;
+                box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
+                overflow: hidden;
+            }
+            #secPosMap::before { content: ''; position: absolute; top: 0; left: 20%; width: 60%; height: 16%; border: 2px solid rgba(255,255,255,0.4); border-top: none; pointer-events: none; }
+            #secPosMap::after { content: ''; position: absolute; bottom: 0; left: 20%; width: 60%; height: 16%; border: 2px solid rgba(255,255,255,0.4); border-bottom: none; pointer-events: none; }
+            .pitch-center-line { position: absolute; top: 50%; left: 0; width: 100%; height: 2px; background: rgba(255,255,255,0.4); transform: translateY(-50%); pointer-events: none; }
+            .pitch-center-circle { position: absolute; top: 50%; left: 50%; width: 60px; height: 60px; border: 2px solid rgba(255,255,255,0.4); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+            .pos-btn-group {
+                position: absolute; transform: translate(-50%, -50%); width: 26%; min-width: 80px; max-width: 110px;
+                background: var(--bg-panel); border: 2px solid var(--border-color); padding: 4px; border-radius: 6px;
+                cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center;
+                text-align: center; transition: opacity 0.2s, box-shadow 0.2s; box-shadow: 0 3px 6px rgba(0,0,0,0.4); opacity: 0.65; z-index: 5;
+            }
+            .pos-btn-group:hover { opacity: 0.95; z-index: 20 !important; }
+            .pos-btn-group.active-sec, .pos-btn-group.main-pos { opacity: 1; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.8); }
+            .pos-btn-group.main-pos { z-index: 15; border-width: 3px; }
+            .node-header { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px; }
+            .node-name { font-weight: 900; font-size: 0.9em; color: var(--text-main); }
+            .node-ovr { font-size: 0.8em; font-weight: bold; padding: 2px 4px; border-radius: 4px; background: rgba(0,0,0,0.1); }
+            .sec-controls { display: none; width: 100%; flex-direction: column; gap: 3px; margin-top: 4px; }
+            .pos-btn-group.active-sec .sec-controls { display: flex; }
+            .role-select { font-size: 0.65em; width: 100%; padding: 2px; cursor: pointer; border-radius: 3px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-main); }
+            .spinner-wrapper { height: 20px; display: flex; width: 100%; }
+            .spin-btn { width: 22px; font-size: 1.1em; line-height: 1; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.1); border:none; color: var(--text-main); cursor:pointer; }
+            .cap-input { font-size: 0.8em; padding: 0; text-align: center; flex: 1; border:none; background: var(--bg-input); color:var(--text-main); width: 100%; }
+        `;
+        document.head.appendChild(pms);
+    }
+
     if (!document.getElementById('drag-styles')) {
         const ds = document.createElement('style');
         ds.id = 'drag-styles';
@@ -301,48 +367,20 @@ document.addEventListener('DOMContentLoaded', () => {
         document.head.appendChild(ds);
     }
     
-    // YENİ VE DAHA ESNEK MOBİL DÜZELTME
     if (!document.getElementById('mobile-responsive-styles')) {
         const ms = document.createElement('style');
         ms.id = 'mobile-responsive-styles';
         ms.innerHTML = `
-            /* Kutu modelini global ve güvenli şekilde ayarla */
-            *, *::before, *::after {
-                box-sizing: border-box;
-            }
-
+            *, *::before, *::after { box-sizing: border-box; }
             @media (max-width: 900px) {
-                /* Sol ve Sağ panel içindeki buton gruplarını mobilde alt alta diz */
-                .left-panel .btn-group, .right-panel .btn-group {
-                    flex-direction: column !important;
-                }
-                .left-panel .btn-group .btn, .right-panel .btn-group .btn {
-                    width: 100% !important;
-                    margin-left: 0 !important;
-                    margin-right: 0 !important;
-                }
-
-                /* Ayarlar barını ve içindeki ögeleri mobilde düzenle */
-                .settings-bar {
-                    flex-direction: column !important;
-                    align-items: stretch !important;
-                }
-                .setting-lbl {
-                    width: 100% !important;
-                    justify-content: center !important;
-                }
-                .settings-bar button {
-                    width: 100% !important;
-                }
-
-                /* Veritabanı yönetim menüsündeki taşmaları engelle */
-                .db-container > div[style*="display: flex"] {
-                    flex-direction: column !important;
-                    align-items: stretch !important;
-                }
-                #dbSelect {
-                    width: 100% !important;
-                }
+                .left-panel .btn-group, .right-panel .btn-group { flex-direction: column !important; }
+                .left-panel .btn-group .btn, .right-panel .btn-group .btn { width: 100% !important; margin-left: 0 !important; margin-right: 0 !important; }
+                .settings-bar { flex-direction: column !important; align-items: stretch !important; }
+                .setting-lbl { width: 100% !important; justify-content: center !important; }
+                .settings-bar button { width: 100% !important; }
+                .db-container > div { flex-direction: column !important; align-items: stretch !important; }
+                #dbSelect { width: 100% !important; }
+                .db-container .btn-group { min-width: 0 !important; width: 100% !important; }
             }
         `;
         document.head.appendChild(ms);
@@ -352,7 +390,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (livePitchWrap) livePitchWrap.style.display = 'none';
 
     const savedSettings = JSON.parse(localStorage.getItem('app_settings')) || { darkMode: false, hideOvr: false, lowHava: true, teamColors: false };
-    
     const cbDarkMode = document.getElementById('cbDarkMode');
     const cbHideOvr = document.getElementById('cbHideOvr');
     const cbLowHava = document.getElementById('cbLowHava');
@@ -406,11 +443,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     cbTeamColors?.addEventListener('change', () => {
         saveSettings();
-        // Algoritmayı baştan çalıştırmak yerine sadece ekrandaki mevcut kartları yeniden çizdir
         if (simResults.length > 0 && document.querySelector('.sim-result-card')) {
-            for (let i = 0; i < simResults.length; i++) {
-                renderSimCard(i);
-            }
+            for (let i = 0; i < simResults.length; i++) { renderSimCard(i); }
         }
     });
 
@@ -434,9 +468,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(pos === 'GK') keys.push('sutKarsilama');
         
         keys.forEach(k => {
-            if(weights[k] !== undefined) {
-                weights[k] = Number(document.getElementById(`rm_${k}`).value) || 0;
-            }
+            if(weights[k] !== undefined) { weights[k] = Number(document.getElementById(`rm_${k}`).value) || 0; }
         });
         saveRoleWeights(); updateLiveRoles(); updatePlayerList();
         alert(`"${role}" rolü başarıyla kaydedildi!`);
@@ -542,8 +574,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     updateCondPreview();
-
-    refreshDatabaseSelect(); renderPositionMap();
+    refreshDatabaseSelect(); 
+    renderPositionMap();
 
     const lastDb = localStorage.getItem('last_used_db');
     if (lastDb && getDatabases()[lastDb]) {
@@ -1050,6 +1082,282 @@ function generateTacticalPitchHTML(lineup, title, teamColor = '#00d2d3', teamTyp
         </div>`;
 }
 
+function updateLiveRoles() {
+    const statsObj = { 
+        pas: Number(document.getElementById('sPas')?.value) || 0, savunma: Number(document.getElementById('sSavunma')?.value) || 0, 
+        sut: Number(document.getElementById('sSut')?.value) || 0, dribling: Number(document.getElementById('sDribling')?.value) || 0, 
+        firsat: Number(document.getElementById('sFirsat')?.value) || 0, hava: Number(document.getElementById('sHava')?.value) || 0, sutKarsilama: Number(document.getElementById('sSutKar')?.value) || 0 
+    };
+    const rawPos = document.getElementById('pMainPos')?.value || 'CB';
+    const mainPos = getBasePosition(rawPos);
+    const secPositions = [];
+    let mainRole = ''; 
+
+    const dummyPlayer = { stats: statsObj, condition: document.getElementById('pCond')?.value || "Tam", bannedPositions: [] };
+
+    document.querySelectorAll('.pos-btn-group').forEach(group => {
+        const pos = group.dataset.pos; 
+        const roleSelect = group.querySelector('.role-select');
+        const ovrEl = group.querySelector('.node-ovr');
+        
+        if (roleSelect && ROLE_WEIGHTS && ROLE_WEIGHTS[pos]) {
+            const bestRole = getBestRoleForStats(pos, statsObj);
+            
+            Array.from(roleSelect.options).forEach(opt => { 
+                if(opt.value === bestRole) opt.text = `⭐ ${opt.value}`; 
+                else if(opt.value !== "") opt.text = opt.value; 
+            });
+            
+            const isMain = (pos === mainPos);
+            const isSec = group.classList.contains('active-sec') && !isMain;
+
+            let activeRole = roleSelect.value || bestRole;
+            let capVal = 0;
+
+            group.style.backgroundColor = 'var(--bg-panel)'; 
+            group.style.borderColor = 'var(--border-color)'; 
+            const nameEl = group.querySelector('.node-name');
+            if (nameEl) nameEl.style.color = 'var(--text-main)';
+
+            if (isMain) {
+                group.classList.add('main-pos'); group.classList.remove('active-sec');
+                if (group.dataset.manual !== 'true') roleSelect.value = ""; 
+                mainRole = roleSelect.value; roleSelect.style.display = 'block';
+                group.style.backgroundColor = '#00d2d3'; 
+                group.style.borderColor = '#00d2d3'; 
+                capVal = 100;
+                if(nameEl) nameEl.style.color = '#1a252f';
+            } else if (isSec) {
+                group.classList.remove('main-pos');
+                if (group.dataset.manual !== 'true') roleSelect.value = ""; 
+                capVal = Number(group.querySelector('.cap-input').value) || 80;
+                secPositions.push({pos, capacity: capVal, role: roleSelect.value});
+                const secControls = group.querySelector('.sec-controls'); if (secControls) secControls.style.display = 'flex';
+                
+                let hue = Math.floor(((capVal - 25) / 75) * 120);
+                if(hue < 0) hue = 0; if(hue > 120) hue = 120;
+                const dynamicColor = capVal === 100 ? '#00d2d3' : `hsl(${hue}, 80%, 45%)`;
+                
+                group.style.backgroundColor = dynamicColor; 
+                group.style.borderColor = dynamicColor; 
+                if(nameEl) nameEl.style.color = '#1a252f';
+            } else { 
+                group.classList.remove('main-pos', 'active-sec');
+                const secControls = group.querySelector('.sec-controls'); if (secControls) secControls.style.display = 'none';
+            }
+
+            if (isMain || isSec) {
+                let ovr = getOvrForPosition(dummyPlayer, pos, activeRole, capVal, false);
+                ovrEl.innerText = ovr;
+                ovrEl.style.backgroundColor = getStatColor(ovr);
+                ovrEl.style.color = '#fff';
+            } else {
+                ovrEl.innerText = '--';
+                ovrEl.style.backgroundColor = 'rgba(0,0,0,0.1)';
+                ovrEl.style.color = 'inherit';
+            }
+        }
+    });
+
+    if (editingPlayerId) {
+        const index = currentPlayers.findIndex(p => String(p.id) === String(editingPlayerId));
+        if (index !== -1) {
+            currentPlayers[index].stats = statsObj;
+            currentPlayers[index].mainPos = mainPos;
+            currentPlayers[index].role = mainRole || currentPlayers[index].role;
+            currentPlayers[index].secondaryPositions = secPositions.map(s => {
+                if(s.role === "") s.role = getBestRoleForStats(s.pos, statsObj);
+                return s;
+            });
+            currentPlayers[index].condition = document.getElementById('pCond')?.value || "Tam";
+            currentPlayers[index].firstName = document.getElementById('pName')?.value.trim() || "İsimsiz";
+            const lName = document.getElementById('pLastName')?.value.trim() || "";
+            currentPlayers[index].lastName = lName;
+            currentPlayers[index].name = lName ? `${currentPlayers[index].firstName} ${lName}` : currentPlayers[index].firstName;
+            currentPlayers[index].shortName = document.getElementById('pShortName')?.value.trim() || "";
+        }
+    }
+}
+
+function renderPositionMap() {
+    const mapEl = document.getElementById('secPosMap');
+    const rawPos = document.getElementById('pMainPos')?.value || 'CB';
+    const mainPos = getBasePosition(rawPos);
+    if(!mapEl) return;
+    
+    const oldSecs = {};
+    document.querySelectorAll('.pos-btn-group').forEach(g => {
+        const p = g.dataset.pos;
+        if (g.classList.contains('active-sec')) {
+            oldSecs[p] = { cap: g.querySelector('.cap-input')?.value || 80, role: g.querySelector('.role-select')?.value };
+        }
+    });
+
+    mapEl.innerHTML = `
+        <div class="pitch-center-line"></div>
+        <div class="pitch-center-circle"></div>
+    `;
+
+    const pitchCoords = {
+        "FW": { top: '10%', left: '50%' },
+        "LW": { top: '22%', left: '15%' },
+        "RW": { top: '22%', left: '85%' },
+        "AM": { top: '26%', left: '50%' },
+        "LM": { top: '40%', left: '15%' },
+        "CM": { top: '44%', left: '50%' },
+        "RM": { top: '40%', left: '85%' },
+        "LWB": { top: '58%', left: '15%' },
+        "DM": { top: '60%', left: '50%' },
+        "RWB": { top: '58%', left: '85%' },
+        "LB": { top: '76%', left: '15%' },
+        "CB": { top: '76%', left: '50%' },
+        "RB": { top: '76%', left: '85%' },
+        "GK": { top: '92%', left: '50%' }
+    };
+
+    ALL_POSITIONS.forEach(pos => {
+      const groupDiv = document.createElement('div');
+      groupDiv.className = `pos-btn-group ${pos === mainPos ? 'main-pos' : ''}`;
+      groupDiv.dataset.pos = pos;
+      groupDiv.style.top = pitchCoords[pos].top;
+      groupDiv.style.left = pitchCoords[pos].left;
+      
+      let innerHTML = `
+        <div class="node-header">
+            <span class="node-name">${pos}</span>
+            <span class="node-ovr">--</span>
+        </div>`;
+      
+      if (pos === mainPos) {
+          innerHTML += `<select class="role-select" style="display:none;"></select>`;
+      } else {
+          innerHTML += `
+          <div class="sec-controls">
+              <div class="spinner-wrapper" style="height:24px; width:100%; display:flex;">
+                  <button type="button" class="spin-btn minus">-</button>
+                  <input type="number" class="cap-input" min="25" max="100" step="5" value="80" style="flex:1;">
+                  <button type="button" class="spin-btn plus">+</button>
+              </div>
+              <select class="role-select"></select>
+          </div>`;
+      }
+      groupDiv.innerHTML = innerHTML;
+      
+      const roleSelect = groupDiv.querySelector('.role-select');
+      if (ROLE_WEIGHTS && ROLE_WEIGHTS[pos]) {
+          const emptyOpt = document.createElement('option'); emptyOpt.value = ""; emptyOpt.text = "Rol Seçiniz"; emptyOpt.disabled = true; emptyOpt.selected = true; roleSelect.appendChild(emptyOpt);
+          Object.keys(ROLE_WEIGHTS[pos]).forEach(r => { const opt = document.createElement('option'); opt.value = r; opt.text = r; roleSelect.appendChild(opt); });
+      }
+      
+      roleSelect.addEventListener('change', () => { groupDiv.dataset.manual = 'true'; updateLiveRoles(); });
+      
+      if (pos !== mainPos) {
+          const capInput = groupDiv.querySelector('.cap-input');
+          capInput.addEventListener('input', () => updateLiveRoles());
+          groupDiv.querySelector('.minus').addEventListener('click', e => { e.stopPropagation(); capInput.value = Math.max(25, Number(capInput.value) - 5); updateLiveRoles(); });
+          groupDiv.querySelector('.plus').addEventListener('click', e => { e.stopPropagation(); capInput.value = Math.min(100, Number(capInput.value) + 5); updateLiveRoles(); });
+      }
+
+      if (oldSecs[pos] && pos !== mainPos) {
+          groupDiv.classList.add('active-sec');
+          const ci = groupDiv.querySelector('.cap-input'); if(ci) ci.value = oldSecs[pos].cap;
+          const rs = groupDiv.querySelector('.role-select'); if(rs) rs.value = oldSecs[pos].role;
+          groupDiv.dataset.manual = 'true';
+      }
+
+      groupDiv.addEventListener('click', (e) => {
+          if(e.target.closest('.sec-controls') || e.target.closest('.role-select')) return;
+          const isMain = groupDiv.dataset.pos === getBasePosition(document.getElementById('pMainPos')?.value || 'CB');
+          if (!isMain) { groupDiv.classList.toggle('active-sec'); updateLiveRoles(); }
+      });
+      
+      mapEl.appendChild(groupDiv);
+    });
+    updateLiveRoles(); 
+}
+
+function handleAddPlayer(e) {
+    if(e) e.preventDefault();
+    
+    const rawMainPos = document.getElementById('pMainPos')?.value || "CB";
+    const mainPos = getBasePosition(rawMainPos); 
+    const mainGroup = document.querySelector(`.pos-btn-group.main-pos`);
+    
+    let mainRole = mainGroup && mainGroup.querySelector('.role-select') ? mainGroup.querySelector('.role-select').value : "";
+    
+    if (mainRole === "") {
+        alert("Lütfen ana mevki için bir rol seçin!");
+        return;
+    }
+
+    let missingSecRole = false;
+    document.querySelectorAll('.pos-btn-group.active-sec').forEach(btn => {
+        let secRole = btn.querySelector('.role-select') ? btn.querySelector('.role-select').value : "";
+        if (secRole === "") missingSecRole = true;
+    });
+
+    if (missingSecRole) {
+        alert("Lütfen aktif ettiğiniz yan mevkiler için bir rol seçin!");
+        return;
+    }
+    
+    const statsObj = { 
+        pas: Number(document.getElementById('sPas')?.value) || 0, savunma: Number(document.getElementById('sSavunma')?.value) || 0, 
+        sut: Number(document.getElementById('sSut')?.value) || 0, şut: Number(document.getElementById('sSut')?.value) || 0,
+        dribling: Number(document.getElementById('sDribling')?.value) || 0, firsat: Number(document.getElementById('sFirsat')?.value) || 0, fırsat: Number(document.getElementById('sFirsat')?.value) || 0, 
+        hava: Number(document.getElementById('sHava')?.value) || 0, sutKarsilama: Number(document.getElementById('sSutKar')?.value) || 0 
+    };
+
+    const fNameVal = document.getElementById('pName')?.value.trim() || "İsimsiz";
+    const lNameVal = document.getElementById('pLastName')?.value.trim() || "";
+    const shortNameVal = document.getElementById('pShortName')?.value.trim() || "";
+
+    let existingBans = [];
+    if (editingPlayerId) {
+        const ep = currentPlayers.find(p => String(p.id) === String(editingPlayerId));
+        if (ep && ep.bannedPositions) existingBans = JSON.parse(JSON.stringify(ep.bannedPositions)); 
+    }
+
+    const playerData = {
+        id: editingPlayerId ? editingPlayerId : Date.now(),
+        firstName: fNameVal, lastName: lNameVal, name: lNameVal ? `${fNameVal} ${lNameVal}` : fNameVal,
+        shortName: shortNameVal, mainPos: mainPos, role: mainRole, condition: document.getElementById('pCond')?.value || "Tam", stats: statsObj, selected: true, secondaryPositions: [],
+        bannedPositions: existingBans 
+    };
+
+    document.querySelectorAll('.pos-btn-group.active-sec').forEach(btn => {
+        let secRole = btn.querySelector('.role-select').value;
+        playerData.secondaryPositions.push({
+            pos: getBasePosition(btn.dataset.pos), role: secRole,
+            capacity: Math.max(25, Number(btn.querySelector('.cap-input')?.value || 80))
+        });
+    });
+
+    if (editingPlayerId) {
+        const index = currentPlayers.findIndex(p => String(p.id) === String(editingPlayerId));
+        if (index !== -1) currentPlayers[index] = playerData;
+        editingPlayerId = null;
+        const btn = document.getElementById('btnAddPlayer'); 
+        if(btn) { btn.innerText = "Oyuncuyu Havuza Ekle"; btn.className = "btn btn-green"; }
+    } else { 
+        currentPlayers.push(playerData); 
+    }
+
+    ['pName', 'pLastName', 'pShortName'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = ""; });
+    
+    // Ekledikten sonra yeni oyuncu için istatistikleri 40'a döndür
+    ['sPas', 'sSavunma', 'sSut', 'sDribling', 'sFirsat', 'sHava'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = 40; });
+    if(document.getElementById('sSutKar')) document.getElementById('sSutKar').value = 0;
+    
+    document.querySelectorAll('.pos-btn-group.active-sec').forEach(btn => btn.classList.remove('active-sec'));
+    
+    const btnCancel = document.getElementById('btnCancelEdit');
+    if (btnCancel) btnCancel.style.display = 'none';
+    
+    renderPositionMap(); updatePlayerList();
+    updateLiveRoles();
+}
+
 function updatePlayerList() {
     const listEl = document.getElementById('playerListEl'); if (!listEl) return;
     chartInstances = {};
@@ -1075,7 +1383,6 @@ function updatePlayerList() {
         if (pList.length > 0) {
             const isOpen = openStates[cat.id] !== false; 
             
-            // UI Taşma Çözümü: margin ve box-sizing eklendi
             html += `<details class="category-item" id="${cat.id}" ${isOpen ? 'open' : ''} style="margin: 10px 5px 5px 5px; border-radius: 4px; overflow: hidden; border: 1px solid #1a6b2e; box-sizing: border-box;">
                         <summary style="background: #1a6b2e; color: white; padding: 8px 12px; cursor: pointer; font-weight: bold; list-style: none; display: flex; justify-content: space-between; align-items: center; user-select: none;">
                             <span>${cat.t} (${pList.length})</span>
@@ -1168,230 +1475,6 @@ function updatePlayerList() {
     document.querySelectorAll('.player-item').forEach(det => { det.addEventListener('toggle', () => { if (det.open) renderRadarChart(Number(det.id.split('-')[1])); }); });
 }
 
-function handleAddPlayer(e) {
-    if(e) e.preventDefault();
-    
-    const rawMainPos = document.getElementById('pMainPos')?.value || "CB";
-    const mainPos = getBasePosition(rawMainPos); 
-    const mainGroup = document.querySelector(`.pos-btn-group.main-pos`);
-    
-    let mainRole = mainGroup && mainGroup.querySelector('.role-select') ? mainGroup.querySelector('.role-select').value : "";
-    
-    if (mainRole === "") {
-        alert("Lütfen ana mevki için bir rol seçin!");
-        return;
-    }
-
-    let missingSecRole = false;
-    document.querySelectorAll('.pos-btn-group.active-sec').forEach(btn => {
-        let secRole = btn.querySelector('.role-select') ? btn.querySelector('.role-select').value : "";
-        if (secRole === "") missingSecRole = true;
-    });
-
-    if (missingSecRole) {
-        alert("Lütfen aktif ettiğiniz yan mevkiler için bir rol seçin!");
-        return;
-    }
-    
-    const statsObj = { 
-        pas: Number(document.getElementById('sPas')?.value) || 0, savunma: Number(document.getElementById('sSavunma')?.value) || 0, 
-        sut: Number(document.getElementById('sSut')?.value) || 0, şut: Number(document.getElementById('sSut')?.value) || 0,
-        dribling: Number(document.getElementById('sDribling')?.value) || 0, firsat: Number(document.getElementById('sFirsat')?.value) || 0, fırsat: Number(document.getElementById('sFirsat')?.value) || 0, 
-        hava: Number(document.getElementById('sHava')?.value) || 0, sutKarsilama: Number(document.getElementById('sSutKar')?.value) || 0 
-    };
-
-    const fNameVal = document.getElementById('pName')?.value.trim() || "İsimsiz";
-    const lNameVal = document.getElementById('pLastName')?.value.trim() || "";
-    const shortNameVal = document.getElementById('pShortName')?.value.trim() || "";
-
-    let existingBans = [];
-    if (editingPlayerId) {
-        const ep = currentPlayers.find(p => String(p.id) === String(editingPlayerId));
-        if (ep && ep.bannedPositions) existingBans = JSON.parse(JSON.stringify(ep.bannedPositions)); 
-    }
-
-    const playerData = {
-        id: editingPlayerId ? editingPlayerId : Date.now(),
-        firstName: fNameVal, lastName: lNameVal, name: lNameVal ? `${fNameVal} ${lNameVal}` : fNameVal,
-        shortName: shortNameVal, mainPos: mainPos, role: mainRole, condition: document.getElementById('pCond')?.value || "Tam", stats: statsObj, selected: true, secondaryPositions: [],
-        bannedPositions: existingBans 
-    };
-
-    document.querySelectorAll('.pos-btn-group.active-sec').forEach(btn => {
-        let secRole = btn.querySelector('.role-select').value;
-        playerData.secondaryPositions.push({
-            pos: getBasePosition(btn.dataset.pos), role: secRole,
-            capacity: Math.max(25, Number(btn.querySelector('.cap-input')?.value || 80))
-        });
-    });
-
-    if (editingPlayerId) {
-        const index = currentPlayers.findIndex(p => String(p.id) === String(editingPlayerId));
-        if (index !== -1) currentPlayers[index] = playerData;
-        editingPlayerId = null;
-        const btn = document.getElementById('btnAddPlayer'); 
-        if(btn) { btn.innerText = "Oyuncuyu Havuza Ekle"; btn.className = "btn btn-green"; }
-    } else { 
-        currentPlayers.push(playerData); 
-    }
-
-    ['pName', 'pLastName', 'pShortName'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = ""; });
-    
-    document.querySelectorAll('.pos-btn-group.active-sec').forEach(btn => btn.classList.remove('active-sec'));
-    
-    const btnCancel = document.getElementById('btnCancelEdit');
-    if (btnCancel) btnCancel.style.display = 'none';
-    
-    renderPositionMap(); updatePlayerList();
-}
-
-function updateLiveRoles() {
-    const statsObj = { 
-        pas: Number(document.getElementById('sPas')?.value) || 0, savunma: Number(document.getElementById('sSavunma')?.value) || 0, 
-        sut: Number(document.getElementById('sSut')?.value) || 0, dribling: Number(document.getElementById('sDribling')?.value) || 0, 
-        firsat: Number(document.getElementById('sFirsat')?.value) || 0, hava: Number(document.getElementById('sHava')?.value) || 0, sutKarsilama: Number(document.getElementById('sSutKar')?.value) || 0 
-    };
-    const rawPos = document.getElementById('pMainPos')?.value || 'CB';
-    const mainPos = getBasePosition(rawPos);
-    const secPositions = [];
-    let mainRole = ''; 
-
-    document.querySelectorAll('.pos-btn-group').forEach(group => {
-        const pos = group.dataset.pos; 
-        const roleSelect = group.querySelector('.role-select');
-        
-        if (roleSelect && ROLE_WEIGHTS && ROLE_WEIGHTS[pos]) {
-            const bestRole = getBestRoleForStats(pos, statsObj);
-            
-            Array.from(roleSelect.options).forEach(opt => { 
-                if(opt.value === bestRole) opt.text = `⭐ ${opt.value}`; 
-                else if(opt.value !== "") opt.text = opt.value; 
-            });
-            
-            const isMain = (pos === mainPos);
-            const isSec = group.classList.contains('active-sec') && !isMain;
-
-            group.style.backgroundColor = ''; group.style.borderColor = ''; group.style.color = '';
-
-            if (isMain) {
-                group.classList.add('main-pos'); group.classList.remove('active-sec');
-                if (group.dataset.manual !== 'true') roleSelect.value = ""; 
-                mainRole = roleSelect.value; roleSelect.style.display = 'block';
-                group.style.backgroundColor = '#00d2d3'; 
-                group.style.borderColor = '#00d2d3'; 
-                const span = group.querySelector('span'); if(span) { span.style.color = '#1a252f'; span.style.fontWeight = '900'; }
-            } else if (isSec) {
-                group.classList.remove('main-pos');
-                if (group.dataset.manual !== 'true') roleSelect.value = ""; 
-                const capVal = Number(group.querySelector('.cap-input').value) || 80;
-                secPositions.push({pos, capacity: capVal, role: roleSelect.value});
-                const secControls = group.querySelector('.sec-controls'); if (secControls) secControls.style.display = 'flex';
-                
-                let hue = Math.floor(((capVal - 25) / 75) * 120);
-                if(hue < 0) hue = 0; if(hue > 120) hue = 120;
-                const dynamicColor = capVal === 100 ? '#00d2d3' : `hsl(${hue}, 80%, 45%)`;
-                
-                group.style.backgroundColor = dynamicColor; 
-                group.style.borderColor = dynamicColor; 
-                const span = group.querySelector('span'); if(span) { span.style.color = '#1a252f'; span.style.fontWeight = '900'; }
-            } else { 
-                group.classList.remove('main-pos', 'active-sec');
-                const secControls = group.querySelector('.sec-controls'); if (secControls) secControls.style.display = 'none';
-                const span = group.querySelector('span'); if(span) { span.style.color = ''; span.style.fontWeight = ''; }
-            }
-        }
-    });
-
-    if (editingPlayerId) {
-        const index = currentPlayers.findIndex(p => String(p.id) === String(editingPlayerId));
-        if (index !== -1) {
-            currentPlayers[index].stats = statsObj;
-            currentPlayers[index].mainPos = mainPos;
-            currentPlayers[index].role = mainRole || currentPlayers[index].role;
-            currentPlayers[index].secondaryPositions = secPositions.map(s => {
-                if(s.role === "") s.role = getBestRoleForStats(s.pos, statsObj);
-                return s;
-            });
-            currentPlayers[index].condition = document.getElementById('pCond')?.value || "Tam";
-            currentPlayers[index].firstName = document.getElementById('pName')?.value.trim() || "İsimsiz";
-            const lName = document.getElementById('pLastName')?.value.trim() || "";
-            currentPlayers[index].lastName = lName;
-            currentPlayers[index].name = lName ? `${currentPlayers[index].firstName} ${lName}` : currentPlayers[index].firstName;
-            currentPlayers[index].shortName = document.getElementById('pShortName')?.value.trim() || "";
-        }
-    }
-}
-
-function renderPositionMap() {
-    const mapEl = document.getElementById('secPosMap');
-    const rawPos = document.getElementById('pMainPos')?.value || 'CB';
-    const mainPos = getBasePosition(rawPos);
-    if(!mapEl) return;
-    
-    const oldSecs = {};
-    document.querySelectorAll('.pos-btn-group').forEach(g => {
-        const p = g.dataset.pos;
-        if (g.classList.contains('active-sec')) {
-            oldSecs[p] = { cap: g.querySelector('.cap-input')?.value || 80, role: g.querySelector('.role-select')?.value };
-        }
-    });
-
-    mapEl.innerHTML = '';
-    ALL_POSITIONS.forEach(pos => {
-      const groupDiv = document.createElement('div');
-      groupDiv.className = `pos-btn-group ${pos === mainPos ? 'main-pos' : ''}`;
-      groupDiv.dataset.pos = pos;
-      
-      let innerHTML = `<span>${pos}</span>`;
-      
-      if (pos === mainPos) {
-          innerHTML += `<select class="role-select"></select>`;
-      } else {
-          innerHTML += `
-          <div class="sec-controls">
-              <div class="spinner-wrapper">
-                  <button type="button" class="spin-btn minus">-</button>
-                  <input type="number" class="cap-input" min="25" max="100" step="5" value="80">
-                  <button type="button" class="spin-btn plus">+</button>
-              </div>
-              <select class="role-select"></select>
-          </div>`;
-      }
-      groupDiv.innerHTML = innerHTML;
-      
-      const roleSelect = groupDiv.querySelector('.role-select');
-      if (ROLE_WEIGHTS && ROLE_WEIGHTS[pos]) {
-          const emptyOpt = document.createElement('option'); emptyOpt.value = ""; emptyOpt.text = "Rol Seçiniz"; emptyOpt.disabled = true; emptyOpt.selected = true; roleSelect.appendChild(emptyOpt);
-          Object.keys(ROLE_WEIGHTS[pos]).forEach(r => { const opt = document.createElement('option'); opt.value = r; opt.text = r; roleSelect.appendChild(opt); });
-      }
-      
-      roleSelect.addEventListener('change', () => { groupDiv.dataset.manual = 'true'; updateLiveRoles(); });
-      
-      if (pos !== mainPos) {
-          const capInput = groupDiv.querySelector('.cap-input');
-          capInput.addEventListener('input', () => updateLiveRoles());
-          groupDiv.querySelector('.minus').addEventListener('click', e => { e.stopPropagation(); capInput.value = Math.max(25, Number(capInput.value) - 5); updateLiveRoles(); });
-          groupDiv.querySelector('.plus').addEventListener('click', e => { e.stopPropagation(); capInput.value = Math.min(100, Number(capInput.value) + 5); updateLiveRoles(); });
-      }
-
-      if (oldSecs[pos] && pos !== mainPos) {
-          groupDiv.classList.add('active-sec');
-          const ci = groupDiv.querySelector('.cap-input'); if(ci) ci.value = oldSecs[pos].cap;
-          const rs = groupDiv.querySelector('.role-select'); if(rs) rs.value = oldSecs[pos].role;
-          groupDiv.dataset.manual = 'true';
-      }
-
-      groupDiv.addEventListener('click', (e) => {
-          if(e.target.closest('.sec-controls')) return;
-          const isMain = groupDiv.dataset.pos === getBasePosition(document.getElementById('pMainPos')?.value || 'CB');
-          if (!isMain) { groupDiv.classList.toggle('active-sec'); updateLiveRoles(); }
-      });
-      
-      mapEl.appendChild(groupDiv);
-    });
-    updateLiveRoles(); 
-}
-
 function renderSimCard(index) {
     const container = document.getElementById(`sim-card-container-${index}`);
     if (!container) return;
@@ -1412,22 +1495,18 @@ function renderSimCard(index) {
     let logHtml = `<div style="color:var(--text-muted); font-size:0.9em; padding:10px;">Değiştirilmiş kadrolar için log hesaplanamaz. Sıfırlayınız.</div>`;
     if (!isModified && dataObj.original.metricsDetails) {
         const details = dataObj.original.metricsDetails;
-        
         const formatCliff = (name, obj) => {
             if(obj.diff === 0 && obj.pen === 0) return `<span style="color:#7f8c8d;">${name}: 0</span>`;
             let mathStr = obj.diff > 5 ? `(${obj.diff}-5)³` : `(${obj.diff} ≤ 5)`;
             let color = obj.diff > 5 ? '#e74c3c' : '#2ecc71';
             return `<span>${name}: |Fark ${obj.diff}| ➔ ${mathStr} = <b style="color:${color};">${obj.pen}</b></span>`;
         };
-
         const isHavaLow = document.getElementById('cbLowHava')?.checked;
 
         logHtml = `
             <div class="sim-log-content" style="font-family: monospace; font-size: 0.9em; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 4px; line-height: 1.6;">
                 <div style="color: #bdc3c7; margin-bottom: 8px;"><b>[🎯] Hedef Kalite (Baseline):</b> ${dataObj.original.targetScore.toFixed(1)} OVR <span style="font-size:0.85em;">(A: ${dataObj.original.sumA.toFixed(2)} | B: ${dataObj.original.sumB.toFixed(2)})</span></div>
-                
                 <div style="color: #3498db; margin-bottom: 4px;"><b>[1] Saf Denge:</b> <span style="color:#ecf0f1;">${details.netDiffFormula}</span> = <b>${details.netDiffPenalty.toFixed(1)} Ceza</b></div>
-                
                 <div style="color: #e74c3c; margin-bottom: 4px;"><b>[2] Kritik Özellik Farkı Cezası:</b> <b>${details.totalCliffPenalty} Ceza</b></div>
                 <div style="padding-left: 15px; color: #95a5a6; font-size: 0.85em; margin-bottom: 8px; line-height: 1.5;">
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px;">
@@ -1439,9 +1518,7 @@ function renderSimCard(index) {
                         ${!isHavaLow ? `<div>${formatCliff('Hava T.', details.cliffPenalties.hava)}</div>` : ''}
                     </div>
                 </div>
-                
                 <div style="color: #f1c40f; margin-bottom: 4px;"><b>[3] Formasyon Grid Cezası (Açıklar):</b> <b>${details.gridPenalty.toFixed(1)} Ceza</b></div>
-                
                 <hr style="border: 0; border-top: 1px dashed rgba(255,255,255,0.2); margin: 8px 0;">
                 <div style="color: #ecf0f1; font-weight: bold; font-size: 1.1em;">NET SKOR (Düşük Daha İyi): ${details.totalPenalty.toFixed(0)}</div>
             </div>
@@ -1487,11 +1564,9 @@ function renderSimCard(index) {
                 <canvas id="teamChart-${index}" style="width:100%; height:100%;"></canvas>
             </div>
         </div>
-
         <details class="sim-log-details" style="margin-top: 15px; border: 1px solid var(--border-color); border-radius: 4px;">
             <summary style="font-weight: bold; color: #3498db; outline: none; list-style: none; cursor:pointer; padding: 10px; background: rgba(52, 152, 219, 0.1);">
                 <span style="display: flex; align-items: center; gap: 5px;">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>
                     Algoritma Karar Dökümü & Ceza Raporu
                 </span>
             </summary>
@@ -1501,9 +1576,7 @@ function renderSimCard(index) {
 
     container.innerHTML = html;
 
-    if (simCharts && simCharts[index]) {
-        simCharts[index].destroy();
-    }
+    if (simCharts && simCharts[index]) { simCharts[index].destroy(); }
     
     const canvas = document.getElementById(`teamChart-${index}`);
     if(canvas) {
@@ -1519,16 +1592,7 @@ function renderSimCard(index) {
             options: { 
                 layout: { padding: 25 }, 
                 maintainAspectRatio: false, 
-                scales: { 
-                    r: { 
-                        min: 0, 
-                        max: 100,
-                        ticks: { display: false }, 
-                        grid: { color: 'rgba(127, 140, 141, 0.2)' }, 
-                        angleLines: { color: 'rgba(127, 140, 141, 0.2)' }, 
-                        pointLabels: { color: '#7f8c8d', font: { size: 12, weight: 'bold' } } 
-                    } 
-                }, 
+                scales: { r: { min: 0, max: 100, ticks: { display: false }, grid: { color: 'rgba(127, 140, 141, 0.2)' }, angleLines: { color: 'rgba(127, 140, 141, 0.2)' }, pointLabels: { color: '#7f8c8d', font: { size: 12, weight: 'bold' } } } }, 
                 plugins: { legend: { display: false } } 
             } 
         });
@@ -1707,11 +1771,13 @@ function cancelEdit(e) {
     safeSet('pShortName', "");
     safeSet('pMainPos', "CB");
     safeSet('pCond', "Tam");
-    safeSet('sPas', 80);
-    safeSet('sSavunma', 50);
-    safeSet('sSut', 70);
-    safeSet('sDribling', 85);
-    safeSet('sFirsat', 90);
+    
+    // Varsayılanları 40'a, kaleci kurtarışını 0'a çektik
+    safeSet('sPas', 40);
+    safeSet('sSavunma', 40);
+    safeSet('sSut', 40);
+    safeSet('sDribling', 40);
+    safeSet('sFirsat', 40);
     safeSet('sHava', 40);
     safeSet('sSutKar', 0);
 
